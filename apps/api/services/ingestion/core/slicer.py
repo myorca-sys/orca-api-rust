@@ -7,8 +7,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class VideoSlicer:
-    def __init__(self, output_dir: str = "/data/data/com.termux/files/home/workspace/anime-scraper-pro/tmp_ingest/hls"):
-        self.output_dir = output_dir
+    def __init__(self, output_dir: str = None):
+        self.output_dir = output_dir or os.getenv("INGEST_HLS_TMP_DIR", "./tmp_ingest/hls")
         os.makedirs(self.output_dir, exist_ok=True)
 
     async def slice(self, url: str, filename: str, provider_id: str = "", segment_time: int = 12) -> Optional[str]:

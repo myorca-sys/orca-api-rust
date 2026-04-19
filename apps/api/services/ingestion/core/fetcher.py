@@ -7,8 +7,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class VideoFetcher:
-    def __init__(self, output_dir: str = "/data/data/com.termux/files/home/workspace/anime-scraper-pro/tmp_ingest"):
-        self.output_dir = output_dir
+    def __init__(self, output_dir: str = None):
+        self.output_dir = output_dir or os.getenv("INGEST_TMP_DIR", "./tmp_ingest")
         os.makedirs(self.output_dir, exist_ok=True)
 
     async def fetch(self, url: str, output_filename: str, provider_id: str = "") -> Optional[str]:
