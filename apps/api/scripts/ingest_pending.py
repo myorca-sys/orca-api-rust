@@ -12,14 +12,14 @@ db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-from databases import Database
+from db.connection import database as db
 from services.ingestion.main import IngestionEngine
-from apps.api.services.stream_cache import _get_all_stream_sources
+from apps.api.services.stream_cache import get_cached_stream
 
 async def ingest_pending(limit: int):
     print(f"🚀 Memulai GitHub Actions Worker: Mencari maksimal {limit} episode tertunda...")
-    db = Database(db_url)
-    await db.connect()
+    if not db.is_connected:
+        await db.connect()
     
     # Cari episode yang URL-nya belum tg-proxy
     query = """
@@ -46,10 +46,10 @@ async def ingest_pending(limit: int):
         
         print(f"\n--- Memproses {aid} Ep {ep_num} ---")
         
-        sources = await _get_all_stream_sources(aid, ep_num)
-        if sources:
-            direct_url = sources[0].get("url", "")
-            provider_id = sources[0].get("source", "unknown")
+        sources_response = await get_cached_stream(aid, ep_num)
+        if sources_response and "sources" in sources_response and len(sources_response["sources"]) > 0:
+            direct_url = sources_response["sources"][0].get("url", "")
+            provider_id = sources_response["sources"][0].get("source", "unknown")
             print(f"Direct URL found: {direct_url[:50]}...")
             
             if direct_url and "tg-proxy" not in direct_url:
