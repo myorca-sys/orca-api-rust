@@ -65,10 +65,16 @@ class IngestionEngine:
             
             filename = f"{provider_id}_{anilist_id}_{episode_number}.mp4"
             
-            # 1 & 2. Streaming Slice (On-the-fly from Provider URL to HLS)
-            m3u8_path = await self.slicer.slice(url=direct_video_url, filename=filename, provider_id=provider_id, segment_time=12)
+            # 1. Fetch Video Locally (with progress and timeout)
+            local_video_path = await self.fetcher.fetch(direct_video_url, filename, provider_id)
+            if not local_video_path:
+                logger.error(f"Failed to fetch video locally from {direct_video_url}")
+                return False
+
+            # 2. Slice Video (from local file, guaranteed not to hang)
+            m3u8_path = await self.slicer.slice(url=local_video_path, filename=filename, provider_id=provider_id, segment_time=12)
             if not m3u8_path:
-                logger.error("Failed to slice video on-the-fly.")
+                logger.error("Failed to slice video locally.")
                 return False
 
             # 3. Upload to Telegram (Parallel Swarm)
@@ -79,17 +85,12 @@ class IngestionEngine:
                 return False
                 
             # 4. Upload the master playlist itself to Telegram or use it directly
-            playlist_file_id = await self.uploader.upload_file(cloud_m3u8_path)
-            if not playlist_file_id:
+            final_stream_url = await self.uploader.upload_file(cloud_m3u8_path)
+            if not final_stream_url:
                 logger.error("Failed to upload master playlist to Telegram.")
                 return False
                 
             # 5. Database Sync (Asynchronous)
-            proxy_url = os.getenv("TG_PROXY_BASE_URL")
-            if not proxy_url:
-                raise ValueError("TG_PROXY_BASE_URL wajib di-set")
-            final_stream_url = f"{proxy_url.rstrip('/')}/{playlist_file_id}"
-            
             should_disconnect = False
             if not database.is_connected:
                 await database.connect()
