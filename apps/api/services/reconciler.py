@@ -30,7 +30,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # ─────────────────────────────────────────────
 # Config
@@ -38,7 +38,7 @@ load_dotenv()
 GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("[WARNING] GEMINI_API_KEY is not set.")
-GEMINI_MODEL    = "gemini-3-flash-preview" # Updated based on user request
+GEMINI_MODEL    = "gemini-2.5-flash"
 GEMINI_ENDPOINT = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent"
@@ -139,7 +139,11 @@ class GeminiMatcher:
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": 80, "temperature": 0},
+            "generationConfig": {
+                "maxOutputTokens": 80, 
+                "temperature": 0,
+                "responseMimeType": "application/json"
+            },
         }
         try:
             r = await cls._get_client().post(GEMINI_ENDPOINT, json=payload)
