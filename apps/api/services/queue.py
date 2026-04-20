@@ -8,33 +8,28 @@ class QStashPublisher:
     
     @staticmethod
     async def publish_sync_task(anilist_id: int):
-        if not QSTASH_TOKEN:
-            print(f"[QStash] Token missing, cannot queue sync for {anilist_id}")
+        from services.cache import upstash_set
+        lock_key = f"lock:sync:{anilist_id}"
+        
+        is_locked = await upstash_set(lock_key, "syncing", ex=300, nx=True)
+        if not is_locked:
+            print(f"[Queue] Sync for {anilist_id} already in progress.")
             return
             
-        # Target webhook URL is dynamic based on environment.
-        # In production, it's the HuggingFace URL or custom domain.
-        target_url = os.getenv("API_PUBLIC_URL", "https://jonyyyyyyyu-anime-scraper-api.hf.space")
-        target_url = f"{target_url.rstrip('/')}/api/v2/webhook/sync"
-        qstash_url = os.getenv("QSTASH_URL", "https://qstash.upstash.io").rstrip("/")
+        print(f"[Queue] Spawning background sync for {anilist_id} directly...")
         
-        async with httpx.AsyncClient() as client:
+        async def _sync_bg():
             try:
-                res = await client.post(
-                    f"{qstash_url}/v2/publish/" + target_url,
-                    headers={
-                        "Authorization": f"Bearer {QSTASH_TOKEN}",
-                        "Content-Type": "application/json",
-                        "Upstash-Retries": "5",  # Higher retries for HF Space cold starts
-                    },
-                    json={"anilistId": anilist_id}
-                )
-                if res.status_code >= 400:
-                    print(f"[QStash] Publish Failed: {res.status_code} - {res.text}")
-                else:
-                    print(f"[QStash] Queued sync for anilistId={anilist_id} successfully.")
+                from services.pipeline import sync_anime_episodes
+                await sync_anime_episodes(anilist_id)
             except Exception as e:
-                print(f"[QStash] Exception publishing to QStash: {e}")
+                print(f"[Queue] Sync background task failed: {e}")
+            finally:
+                from services.cache import upstash_del
+                await upstash_del(lock_key)
+                
+        import asyncio
+        asyncio.create_task(_sync_bg())
 
     @staticmethod
     async def publish_ingest_task(episode_id: int, anilist_id: int, provider_id: str, episode_number: float, direct_url: str, delay: str = None):
@@ -93,10 +88,6 @@ class QStashPublisher:
 
     @staticmethod
     async def publish_ingest_batch_task():
-        if not QSTASH_TOKEN:
-            print(f"[QStash] Token missing, cannot queue batch ingest")
-            return
-
         # Deduplication: Prevent redundant batch triggers within 15 minutes (900s)
         from services.cache import upstash_set
         lock_key = "lock:ingest_batch_trigger"
@@ -107,32 +98,15 @@ class QStashPublisher:
         }, ex=900, nx=True)
         
         if not is_locked:
-            print(f"[QStash] Batch ingest trigger already queued. Skipping deduplicate.")
+            print(f"[Queue] Batch ingest trigger already running. Skipping deduplicate.")
             return
-            
-        target_url = os.getenv("API_PUBLIC_URL", "https://jonyyyyyyyu-anime-scraper-api.hf.space")
-        target_url = f"{target_url.rstrip('/')}/api/v2/webhook/ingest-batch"
-        qstash_url = os.getenv("QSTASH_URL", "https://qstash.upstash.io").rstrip("/")
-        
-        headers = {
-            "Authorization": f"Bearer {QSTASH_TOKEN}",
-            "Content-Type": "application/json",
-            "Upstash-Retries": "5", 
-        }
-            
-        async with httpx.AsyncClient() as client:
-            try:
-                res = await client.post(
-                    f"{qstash_url}/v2/publish/" + target_url,
-                    headers=headers,
-                    json={"action": "run_batch"}
-                )
-                if res.status_code >= 400:
-                    print(f"[QStash] Ingest Batch Publish Failed: {res.status_code} - {res.text}")
-                else:
-                    print(f"[QStash] Queued Batch Ingestion successfully.")
-            except Exception as e:
-                print(f"[QStash] Exception publishing batch ingest to QStash: {e}")
+
+        # Direct Background Execution (Bypasses QStash)
+        # Because we are already running on the HF Space FastAPI, we can just spawn a task!
+        print("[Queue] Spawning background batch ingestion directly...")
+        import asyncio
+        from routes.webhook import _run_ingest_batch_bg
+        asyncio.create_task(_run_ingest_batch_bg())
 
 enqueue_sync = QStashPublisher.publish_sync_task
 enqueue_ingest = QStashPublisher.publish_ingest_task
