@@ -1,6 +1,11 @@
-# Session Snapshot: Enterprise Scalability, Auto-Hunter, & Big Tech Social Schema
+# Session Snapshot: The Ultimate $0 Cloud Architecture & Enterprise Scalability
 
-## 🎯 Pencapaian Utama Terkini
+## 🎯 Pencapaian Utama Terkini (Arsitektur Anti-Limit)
+1. **Cloudflare Cache API (Unlimited Worker):** Proxy Telegram (`tg-proxy`) sekarang mengabaikan *Range Request* untuk file HLS (`.ts`) agar Cloudflare meng- *cache* file seutuhnya dengan status `200 OK`. Ini memangkas konsumsi batas harian 100.000 *Workers* menjadi hampir 0 untuk penonton kedua dan seterusnya.
+2. **Database-as-a-Queue (DBaaQ) Bypassing QStash:** Mengatasi batas 1.000 pesan/hari QStash dengan mengubah arsitekturnya. Permintaan *Ingestion* kini langsung menciptakan proses asinkron (*Background Task*) di *FastAPI Hugging Face Space*. Redis digunakan secara efisien sebagai *Distributed Lock* berdurasi 15 menit agar server HF tidak *OOM* (Out-of-Memory). QStash tidak lagi ditembak secara membabi buta.
+3. **Cron Job Optimization:** Menurunkan jadwal pengecekan `ingest_pending.py` GitHub Actions dari 6 jam menjadi 12 jam, mengamankan batas gratis 2.000 menit komputasi bulanan. GitHub Actions kini murni beroperasi sebagai "Penyapu Ranjau Cadangan" (*Fallback Sweeper*).
+
+## 🎯 Historis Pencapaian Sebelumnya
 1. **Auto-Triage Telegram Bot (Cloud Cron)**
    - Mengimplementasikan pemantau antrean otomatis dengan biaya $0 menggunakan QStash dan Upstash Redis.
    - Endpoint baru `/webhook/triage` pada `webhook.py` dikonfigurasi untuk mengirim peringatan instan (🚨 Red Alert) ke channel Telegram apabila ada tugas *ingestion* yang terkena *Rate Limit* atau gagal.
@@ -21,8 +26,13 @@
 - **Frontend:** Auth via BetterAuth Google telah beroperasi penuh secara *direct*. Hook `useCollection` dan `useWatchHistory` kini memiliki fondasi backend yang solid dan telah terintegrasi dengan benar dengan struktur `user` dari BetterAuth.
 - **Backend (`apps/api`):** Skema `models.py` telah diperbarui agar selaras (1:1) dengan tabel Drizzle (BetterAuth). Endpoint `/api/v2/collection/` dan `/api/v2/comments/` stabil dan tidak lagi terkena *Database Integrity Error* saat mengakses tabel `user`.
 
-## 📌 Rencana Sesi Berikutnya (Delegasi ke Agen 1 - Backend Specialist)
-**Tugas Utama Agen 1:**
+## 📌 Rencana Sesi Berikutnya (Delegasi ke Claude & Agen 1)
+**Tugas Tambahan:**
+- [ ] Buka plan `.agents/CLAUDE_RECONCILER_TASK.md` untuk perbaikan sistem *Reconciler / Auto-Mapper*.
+- [ ] Perbaiki logika pencarian judul ke API Anilist di `reconciler.py` agar tidak langsung gagal jika *provider* mengirimkan judul berbentuk *slug* yang kotor (seperti `one-piece-op`).
+- [ ] Implementasikan tebakan cerdas menggunakan Gemini jika pencarian Anilist awal gagal.
+
+**Tugas Sosial (Sebelumnya):**
 - [ ] Buka plan `agent1-social-schema.md` untuk konteks penuh.
 - [ ] Perbaiki konflik Alembic di backend. Konfigurasikan `env.py` Alembic agar **mengabaikan** tabel yang dikelola Drizzle (seperti `user`, `account`, `session`, `verification`, `watch_history`, `bookmarks`).
 - [ ] Selesaikan pembuatan *autogenerate migration* untuk `activity_feed` (new table) dan `notifications` (update fields).
