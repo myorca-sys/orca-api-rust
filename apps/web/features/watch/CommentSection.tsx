@@ -64,8 +64,8 @@ export function CommentSection({ anilistId, episode, currentTime, onSeek, user }
         body: JSON.stringify({ user_id: userId, anilistId: parseInt(anilistId), episodeNumber: parseFloat(episode), text, parent_id: parentId, timestamp_sec: parentId ? null : Math.floor(currentTime) })
       });
       if (res.ok) {
-        mutate(`${API}/api/v2/comments?anilistId=${anilistId}&episodeNumber=${episode}&sort_by=${sortBy}`);
-        if (parentId) mutate(`${API}/api/v2/comments?anilistId=${anilistId}&episodeNumber=${episode}&parent_id=${parentId}&sort_by=newest`);
+        mutate(`${API}/api/v2/comments?anilistId=${anilistId}&episodeNumber=${episode}&sort_by=${sortBy}${userId ? `&user_id=${userId}` : ''}`);
+        if (parentId) mutate(`${API}/api/v2/comments?anilistId=${anilistId}&episodeNumber=${episode}&parent_id=${parentId}&sort_by=newest${userId ? `&user_id=${userId}` : ''}`);
       }
     } catch (e) {}
   };
@@ -147,23 +147,26 @@ export function CommentSection({ anilistId, episode, currentTime, onSeek, user }
       )}
 
       {/* Thread Modal Layer */}
-      {activeThread && (
-        <div className="fixed top-[56.25vw] bottom-0 left-0 right-0 z-[300] flex flex-col bg-black md:bg-black/80 md:backdrop-blur-xl anim-slide-up md:top-0">
-          <div className="h-14 flex items-center px-4 gap-4 border-b border-white/10 md:max-w-2xl md:mx-auto md:w-full bg-black shrink-0">
-            <button onClick={() => setActiveThread(null)} className="p-2 text-white"><IconBack /></button>
-            <div className="flex flex-col"><span className="text-white font-black text-sm">Balasan</span><span className="text-[10px] text-[#8e8e93] font-bold">ke @{activeThread.username}</span></div>
-          </div>
-          <div className="flex-1 overflow-y-auto no-scrollbar md:max-w-2xl md:mx-auto md:w-full bg-black">
-            <div className="p-4 bg-white/[0.03] border-b border-white/5">
-              <CommentItem comment={activeThread} hideActions onSeek={onSeek} userId={userId} />
+      {activeThread && (() => {
+        const currentActiveThread = Array.isArray(allComments) ? allComments.find((c: any) => c.id === activeThread.id) || activeThread : activeThread;
+        return (
+          <div className="fixed top-[56.25vw] bottom-0 left-0 right-0 z-[300] flex flex-col bg-black md:bg-black/80 md:backdrop-blur-xl anim-slide-up md:top-0">
+            <div className="h-14 flex items-center px-4 gap-4 border-b border-white/10 md:max-w-2xl md:mx-auto md:w-full bg-black shrink-0">
+              <button onClick={() => setActiveThread(null)} className="p-2 text-white"><IconBack /></button>
+              <div className="flex flex-col"><span className="text-white font-black text-sm">Balasan</span><span className="text-[10px] text-[#8e8e93] font-bold">ke @{currentActiveThread.username}</span></div>
             </div>
-            <ThreadList parentId={activeThread.id} anilistId={anilistId} episode={episode} userId={userId} onLike={handleLike} />
+            <div className="flex-1 overflow-y-auto no-scrollbar md:max-w-2xl md:mx-auto md:w-full bg-black">
+              <div className="p-4 bg-white/[0.03] border-b border-white/5">
+                <CommentItem comment={currentActiveThread} hideActions onSeek={onSeek} userId={userId} />
+              </div>
+              <ThreadList replies={currentActiveThread.replies || []} userId={userId} onLike={handleLike} />
+            </div>
+            <div className="p-3 border-t border-white/10 bg-[#1c1c1e] md:max-w-2xl md:mx-auto md:w-full shrink-0">
+              <CommentComposer userId={userId} autoFocus placeholder={`Balas @${currentActiveThread.username}...`} onSubmit={(t: string) => handleSubmit(t, currentActiveThread.id)} />
+            </div>
           </div>
-          <div className="p-3 border-t border-white/10 bg-[#1c1c1e] md:max-w-2xl md:mx-auto md:w-full shrink-0">
-            <CommentComposer userId={userId} autoFocus placeholder={`Balas @${activeThread.username}...`} onSubmit={(t: string) => handleSubmit(t, activeThread.id)} />
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -222,18 +225,10 @@ const CommentComposer = ({ userId, onSubmit, compact, autoFocus, placeholder }: 
   );
 };
 
-const ThreadList = ({ parentId, anilistId, episode, userId, onLike }: any) => {
-  const { data: replies = [], isLoading } = useSWR(
-    `${API}/api/v2/comments?anilistId=${anilistId}&episodeNumber=${episode}&parent_id=${parentId}&sort_by=newest`,
-    fetcher,
-    { refreshInterval: 15000 }
-  );
-
-  if (isLoading && replies.length === 0) return <div className="p-10 flex justify-center"><div className="w-5 h-5 border-2 border-[#0a84ff] border-t-transparent rounded-full animate-spin" /></div>;
-
+const ThreadList = ({ replies = [], userId, onLike }: any) => {
   return (
     <div className="p-4 space-y-1 border-l border-white/5 ml-6">
-      {replies.length === 0 && !isLoading && <p className="text-[#8e8e93] text-xs py-4 italic">Belum ada balasan.</p>}
+      {replies.length === 0 && <p className="text-[#8e8e93] text-xs py-4 italic">Belum ada balasan.</p>}
       {replies.map((r: any) => <CommentItem key={r.id} comment={r} hideActions userId={userId} onLike={() => onLike(r.id)} />)}
     </div>
   );
