@@ -141,12 +141,22 @@ async def ingest_webhook(request: Request):
 
 async def _run_ingest_batch_bg():
     try:
+        import os
         print("[Webhook] Running batch ingestion worker in background...")
         import asyncio.subprocess
+        
+        env = os.environ.copy()
+        # Add apps/api to PYTHONPATH so absolute imports like `from db.connection...` resolve properly
+        api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        env["PYTHONPATH"] = f"{env.get('PYTHONPATH', '')}:{api_dir}".strip(":")
+        
+        script_path = os.path.join(api_dir, "scripts", "ingest_pending.py")
+        
         process = await asyncio.create_subprocess_exec(
-            "python", "apps/api/scripts/ingest_pending.py", "--limit", "10",
+            "python", script_path, "--limit", "10",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env
         )
         stdout, stderr = await process.communicate()
         if process.returncode != 0:
