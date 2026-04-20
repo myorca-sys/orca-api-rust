@@ -57,7 +57,7 @@ async def get_comments(anilistId: int, episodeNumber: float, user_id: Optional[s
             
     return top_level
 
-@router.post("/")
+@router.post("")
 async def post_comment(comment: CommentCreate):
     stmt = pg_insert(comments).values(
         user_id=comment.user_id,

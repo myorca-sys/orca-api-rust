@@ -91,7 +91,7 @@ export default function WatchClient({ id, episode: initialEpisode, title, poster
     { revalidateOnFocus: false }
   );
 
-  const { data: animeStats } = useSWR(
+  const { data: animeStats, mutate: mutateAnimeStats } = useSWR(
     mounted ? `https://jonyyyyyyyu-anime-scraper-api.hf.space/api/v2/social/anime/${id}/stats` : null,
     async (url) => {
       const res = await fetch(url);
@@ -106,7 +106,7 @@ export default function WatchClient({ id, episode: initialEpisode, title, poster
 
   useEffect(() => {
     if (!mounted || !session?.user?.id) return;
-    
+
     const timer = setTimeout(() => {
       fetch('https://jonyyyyyyyu-anime-scraper-api.hf.space/api/v2/social/watch-event', {
         method: 'POST',
@@ -118,12 +118,17 @@ export default function WatchClient({ id, episode: initialEpisode, title, poster
           event_type: 'complete',
           timestamp_sec: 0
         })
+      }).then(() => {
+        // Optimistically update views after watching for 5 seconds
+        mutateAnimeStats((prev: any) => ({
+          ...prev,
+          total_episode_views: (prev?.total_episode_views || 0) + 1
+        }), false);
       }).catch(console.error);
     }, 5000);
-    
-    return () => clearTimeout(timer);
-  }, [activeEpisode, mounted, session?.user?.id, id]);
 
+    return () => clearTimeout(timer);
+  }, [activeEpisode, mounted, session?.user?.id, id, mutateAnimeStats]);
   const handleLike = async () => {
     if (!session?.user?.id) return alert("Silakan login untuk menyukai episode ini.");
     

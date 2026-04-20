@@ -29,7 +29,7 @@ async def get_collection(user_id: str):
     rows = await database.fetch_all(query=query)
     return [dict(row) for row in rows]
 
-@router.post("/")
+@router.post("")
 async def save_collection(coll: CollectionUpdate):
     stmt = pg_insert(collections).values(
         userId=coll.user_id,
