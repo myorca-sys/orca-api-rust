@@ -537,25 +537,8 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
           >
             {previewPos !== null && duration > 0 && (
               <div className="absolute bottom-full mb-4 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-1" style={{ left: `${previewPos}%` }}>
-                <div className="w-32 aspect-video bg-black/80 border border-white/20 rounded-lg overflow-hidden shadow-2xl relative flex items-center justify-center">
-                   {current && current.type !== "hls" && !current.url.includes("m3u8") && (
-                     <video 
-                       src={current.url}
-                       className="w-full h-full object-cover absolute inset-0 opacity-50"
-                       ref={(el) => {
-                         if (el) {
-                            const time = (previewPos / 100) * duration;
-                            if (Math.abs(el.currentTime - time) > 1) {
-                              el.currentTime = time;
-                            }
-                         }
-                       }}
-                       muted
-                       playsInline
-                       preload="auto"
-                     />
-                   )}
-                   <span className="text-[12px] font-bold text-white z-10 drop-shadow-md bg-black/40 px-1.5 py-0.5 rounded">{fmt((previewPos / 100) * duration)}</span>
+                <div className="px-2 py-1 bg-black/80 border border-white/20 rounded-lg shadow-2xl flex items-center justify-center">
+                   <span className="text-[13px] font-bold text-white drop-shadow-md">{fmt((previewPos / 100) * duration)}</span>
                 </div>
               </div>
             )}

@@ -410,6 +410,20 @@ async def _live_scrape(episode_url: str, provider_id: str) -> Optional[CachedPay
 
     final_sources.sort(key=_sort_key, reverse=True)
 
+    try:
+        from utils.signed_url import sign_stream_url
+        for source in final_sources:
+            if source.get("type") in ("hls", "mp4", "direct"):
+                raw_url = source.get("raw_url") or source.get("url")
+                if raw_url and "workers.dev" not in raw_url and "tg-proxy" not in raw_url:
+                    # Let's wrap it in our Cloudflare proxy
+                    provider_for_proxy = "mp4upload" if "mp4upload" in raw_url else provider_id
+                    source["raw_url"] = raw_url
+                    source["url"] = sign_stream_url(raw_url, provider_for_proxy, source["quality"])
+                    source["proxied"] = True
+    except Exception as e:
+        logger.warning(f"Error wrapping signed url in stream_cache: {e}")
+
     return build_cached_payload(final_sources, downloads)
 
 

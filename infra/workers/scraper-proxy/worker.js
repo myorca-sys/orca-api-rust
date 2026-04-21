@@ -57,6 +57,17 @@ async function signSegmentUrl(raw_url, provider_id, currentB64, currentSig, envS
 
 export default {
   async fetch(request, env, ctx) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+          "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "Range, Content-Type, Authorization",
+          "Access-Control-Max-Age": "86400",
+        }
+      });
+    }
+
     const url = new URL(request.url);
     
     // Route: /s/{base64payload}.{signature}
@@ -161,16 +172,26 @@ async function handleProxy(upstream, request, env, payload, match) {
     }
     
     // MP4/TS passthrough streaming
+    const outHeaders = new Headers();
+    outHeaders.set("Access-Control-Allow-Origin", "*");
+    outHeaders.set("Accept-Ranges", "bytes");
+    outHeaders.set("Cache-Control", "public, max-age=3600");
+
+    let ct = resp.headers.get("Content-Type");
+    if (upstream.includes('.mp4') || (payload && payload.p === 'mp4upload')) {
+        ct = "video/mp4";
+    }
+    if (ct) outHeaders.set("Content-Type", ct);
+    
+    const cl = resp.headers.get("Content-Length");
+    if (cl) outHeaders.set("Content-Length", cl);
+    
+    const cr = resp.headers.get("Content-Range");
+    if (cr) outHeaders.set("Content-Range", cr);
+
     return new Response(resp.body, {
       status: resp.status,
-      headers: {
-        "Content-Type": resp.headers.get("Content-Type") || "video/mp4",
-        "Content-Length": resp.headers.get("Content-Length") || "",
-        "Content-Range": resp.headers.get("Content-Range") || "",
-        "Accept-Ranges": "bytes",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
-      }
+      headers: outHeaders
     });
   } catch (error) {
     return new Response(`Proxy Error: ${error.message}`, { status: 502 });

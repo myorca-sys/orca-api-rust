@@ -5,14 +5,9 @@ from db.connection import database
 from db.models import collections, users as user_table, anime_metadata
 from sqlalchemy import select, delete, func, String
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from schemas.collection import CollectionUpdate
 
 router = APIRouter()
-
-class CollectionUpdate(BaseModel):
-    user_id: str
-    anilistId: str
-    status: str
-    progress: float = 0
 
 @router.get("")
 async def get_collection(user_id: str):

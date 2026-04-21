@@ -111,6 +111,8 @@ users = Table(
     Column("email", String, unique=True, nullable=False),
     Column("emailVerified", Boolean, nullable=False, default=False),
     Column("image", Text),
+    Column("tier", String, nullable=False, server_default="FREE"),
+    Column("subscription_expiry", DateTime, nullable=True),
     Column("createdAt", DateTime, nullable=False, server_default=func.now()),
     Column("updatedAt", DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 )
@@ -170,6 +172,20 @@ activity_feed = Table(
     Column("metadata", JSON, nullable=False),
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
     Index("idx_activity_feed_user", "user_id", "created_at"),
+)
+
+payment_logs = Table(
+    "payment_logs",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("provider", String, nullable=False), # "trakteer" | "saweria"
+    Column("external_id", String, unique=True),  # ID transaksi dari provider
+    Column("amount", Float, nullable=False),
+    Column("message", Text),
+    Column("user_id", String, ForeignKey("user.id", ondelete="SET NULL"), nullable=True),
+    Column("status", String, default="processed"),
+    Column("raw_payload", JSON),
+    Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )
 
 episode_likes = Table(

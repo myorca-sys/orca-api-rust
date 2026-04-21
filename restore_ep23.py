@@ -1,24 +1,28 @@
 import asyncio
 import os
 import sys
-
-sys.path.append(os.path.join(os.getcwd(), 'apps', 'api'))
-from databases import Database
 from dotenv import load_dotenv
 
-load_dotenv("apps/api/.env")
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(ROOT_DIR, "apps/api"))
+
+load_dotenv("apps/api/.env", override=True)
 db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-async def main():
-    db = Database(db_url)
+from db.connection import database as db
+
+async def run():
     await db.connect()
-    # Kembalikan ke URL Kuronime asli agar user bisa nonton dengan teks via Iframe/Stream web dulu
-    url = "https://kuronime.sbs/nonton-tensei-shitara-slime-datta-ken-episode-23/"
-    await db.execute('UPDATE episodes SET "episodeUrl" = :url, "providerId" = \'kuronime\' WHERE "anilistId" = 101280 AND "episodeNumber" = 23.0', values={"url": url})
-    print("✅ Episode 23 RESTORED to original provider link (with subtitles).")
+    
+    await db.execute("""
+        UPDATE episodes 
+        SET "episodeUrl" = 'http://placeholder.com'
+        WHERE id = 198101
+    """)
+    print("Restored Ep 23 URL to placeholder so it can be re-ingested.")
     await db.disconnect()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run())

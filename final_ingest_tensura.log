@@ -1,0 +1,76 @@
+nohup: ignoring input
+INFO:databases:Connected to database postgresql+asyncpg://neondb_owner:********@ep-red-star-a19jjtnh-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+INFO:httpx:HTTP Request: POST https://graphql.anilist.co "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:oploverz:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:kuronime:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:samehadaku:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://v2.samehadaku.how/anime/tensei-shitara-slime-datta-ken-2nd-season/ "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:samehadaku:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:samehadaku:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://v2.samehadaku.how/tensei-shitara-slime-datta-ken-season-2-episode-1/ "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:kuronime:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:kuronime:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://v2.samehadaku.how/wp-admin/admin-ajax.php "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:kuronime:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://v2.samehadaku.how/wp-admin/admin-ajax.php "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://v2.samehadaku.how/wp-admin/admin-ajax.php "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:samehadaku:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:oploverz:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://o.oploverz.ltd/series/that-time-i-got-reincarnated-as-a-slime/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET http://oploverz.site/series/that-time-i-got-reincarnated-as-a-slime/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/that-time-i-got-reincarnated-as-a-slime/episode/1/ "HTTP/1.1 308 Permanent Redirect"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/that-time-i-got-reincarnated-as-a-slime/episode/1 "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/incr/cb:oploverz:fails "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:oploverz:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:oploverz:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://o.oploverz.ltd/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET http://oploverz.site/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1/ "HTTP/1.1 308 Permanent Redirect"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1 "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/incr/cb:oploverz:fails "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:oploverz:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:oploverz:open "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://o.oploverz.ltd/series/tensura-2/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET http://oploverz.site/series/tensura-2/episode/1/ "HTTP/1.1 301 Moved Permanently"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/tensura-2/episode/1/ "HTTP/1.1 308 Permanent Redirect"
+INFO:httpx:HTTP Request: GET https://oploverz.site/series/tensura-2/episode/1 "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/incr/cb:oploverz:fails "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:oploverz:fails?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://close-sunfish-80475.upstash.io/set/cb:oploverz:open?EX=300 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://close-sunfish-80475.upstash.io/get/cb:oploverz:open "HTTP/1.1 200 OK"
+INFO:databases:Disconnected from database postgresql+asyncpg://neondb_owner:********@ep-red-star-a19jjtnh-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+[Kuronime Debug] API Response data keys: ['status', 'token', 'blog', 'src', 'src_sd', 'mirror', 'statusMirror', 'raw', 'pitch']
+[Kuronime Debug] Decrypted src: {"token":"b0c4ce660e22bff0db94eb9d725ffe44","src":"https://ccnal---sn-179122461035811bgpp-ams-onep.kuroplayer.xyz/hls/playlists/blog/Z8-Wpnltj7KtdasU8E1sGg/1776877200/9/3/b0c4ce660e22bff0db94eb9d725ffe44/1080p/index.m3u8"}
+[Kuronime Debug] Found src_url: https://ccnal---sn-179122461035811bgpp-ams-onep.kuroplayer.xyz/hls/playlists/blog/Z8-Wpnltj7KtdasU8E1sGg/1776877200/9/3/b0c4ce660e22bff0db94eb9d725ffe44/1080p/index.m3u8
+[Kuronime Debug] Decrypted src_sd: {"token":"b0c4ce660e22bff0db94eb9d725ffe44-SD","src":"https://ccnal---sn-179122461035811bgpp-ams-onep.kuroplayer.xyz/hls/playlists/blog/Z8-Wpnltj7KtdasU8E1sGg/1776877200/9/3/b0c4ce660e22bff0db94eb9d725ffe44/480p/index.m3u8"}
+[Kuronime Debug] Found src_url: https://ccnal---sn-179122461035811bgpp-ams-onep.kuroplayer.xyz/hls/playlists/blog/Z8-Wpnltj7KtdasU8E1sGg/1776877200/9/3/b0c4ce660e22bff0db94eb9d725ffe44/480p/index.m3u8
+[Extractor] Falling back to SmartExtractor for https://dooood.com/e/l89iz1ahy1qqq8roo9rlw0pg8ca0smqj
+[Extractor] Falling back to SmartExtractor for https://dooood.com/e/nmtm1t02qqnlyn78aczf9suceqma5jc6
+[Extractor] Falling back to SmartExtractor for https://dooood.com/e/06pe6k69fuqg9lnuy8m4zotjsjgf7mg9
+[Extractor] Falling back to SmartExtractor for https://vidhidevip.com/v/ra8y6cus5rm0
+[Extractor] Falling back to SmartExtractor for https://dooood.com/e/d8catk6oso5grzw4if132rgw7v7kuv21
+[Extractor] Falling back to SmartExtractor for https://pixeldrain.com/u/rxWH6FJ6?embed
+[Extractor] Falling back to SmartExtractor for https://stream.coeg.me/embed.php?emFrMkJqTFREOE90WFhkblp5TlYyYjUrZ0NMWHRqSHBvQjVPa2twaFZXQT06OmtUWab5KfKYXzhxmYRxUps%3D
+[SSRF ERROR] blocked 'https://stream.coeg.me/embed.php?emFrMkJqTFREOE90WFhkblp5TlYyYjUrZ0NMWHRqSHBvQjVPa2twaFZXQT06OmtUWab5KfKYXzhxmYRxUps%3D': DNS resolution failed for 'stream.coeg.me': [Errno 7] No address associated with hostname
+[Extractor] SmartExtractor fallback error on https://stream.coeg.me/embed.php?emFrMkJqTFREOE90WFhkblp5TlYyYjUrZ0NMWHRqSHBvQjVPa2twaFZXQT06OmtUWab5KfKYXzhxmYRxUps%3D: SSRF protection blocked request: DNS resolution failed for 'stream.coeg.me': [Errno 7] No address associated with hostname
+[Extractor] Falling back to SmartExtractor for https://file.fm/embed/playerv2?hash=vm956p769&w=100%&h=100%&poster_src=https://file.fm/thumb_video_picture.php?i=vm956p769
+[Extractor] Falling back to SmartExtractor for https://www101.zippyshare.com/v/TbOC1cWN/file.html
+[Extractor] Falling back to SmartExtractor for https://acefile.co/f/35236543/tss-s2-01-360p-samehadaku-vip-mkv
+[Extractor] Falling back to SmartExtractor for https://reupload.org/etiyvssz407l
+[Extractor] Falling back to SmartExtractor for https://www101.zippyshare.com/v/pSMeaqxP/file.html
+[Oploverz] Error: 
+[oploverz] Request failed: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/that-time-i-got-reincarnated-as-a-slime/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[Oploverz] Error: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/that-time-i-got-reincarnated-as-a-slime/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[oploverz] Request failed: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[Oploverz] Error: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/tensei-shitara-slime-datta-ken-2nd-season/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[CircuitBreaker] Tripped! Open for 300s for oploverz
+[oploverz] Request failed: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/tensura-2/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[Oploverz] Error: Server error '500 Internal Server Error' for url 'https://oploverz.site/series/tensura-2/episode/1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+[oploverz] Circuit is OPEN for oploverz.
+Gagal mendapatkan sumber video

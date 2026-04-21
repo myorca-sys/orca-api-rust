@@ -59,7 +59,7 @@ anilist_sem = asyncio.Semaphore(5)
 
 GET_ANIME_BY_ID = """
   query ($id: Int) {
-    Media(id: $id, type: ANIME) {
+    Media(id: $id, type: ANIME, isAdult: false) {
       id
       title {
         romaji
@@ -216,6 +216,11 @@ async def fetch_anilist_info(title: str):
                 data = response.json()
                 media_list = data.get('data', {}).get('Page', {}).get('media', [])
 
+            if not media_list:
+                anilist_cache[cache_key] = None
+                return None
+                
+            media_list = [m for m in media_list if 'Hentai' not in m.get('genres', [])]
             if not media_list:
                 anilist_cache[cache_key] = None
                 return None

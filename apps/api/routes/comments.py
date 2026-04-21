@@ -5,22 +5,9 @@ from db.connection import database
 from db.models import comments, comment_reactions
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from schemas.comments import CommentCreate, CommentReaction
 
 router = APIRouter()
-
-class CommentCreate(BaseModel):
-    user_id: str
-    anilistId: int
-    episodeNumber: float
-    text: str
-    parent_id: Optional[int] = None
-    is_spoiler: bool = False
-    timestamp_sec: Optional[int] = None
-
-class CommentReaction(BaseModel):
-    user_id: str
-    comment_id: int
-    emoji: str # e.g., "like", "love", "laugh"
 
 @router.get("")
 async def get_comments(anilistId: int, episodeNumber: float, user_id: Optional[str] = None):

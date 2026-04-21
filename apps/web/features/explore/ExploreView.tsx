@@ -1,12 +1,11 @@
-// features/explore/ExploreView.tsx — Search-first explore with AniList proxy
+// features/explore/ExploreView.tsx — Search-first explore using our own DB
 "use client";
 
-import { useState, useEffect, useCallback, memo, Suspense, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/core/lib/api";
 import { AnimeCard } from "@/ui/cards/AnimeCard";
 import { IconSearch, IconClose, IconClock } from "@/ui/icons";
-import { useSettings } from "@/core/stores/app-store";
 
 const GENRES = [
   { name: "Action", gradient: "from-[#FF3B30] to-[#FF2D55]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/nx21-6895.jpg" },
@@ -22,17 +21,6 @@ const GENRES = [
   { name: "Mystery", gradient: "from-[#AF52DE] to-[#BF5AF2]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx11061-9vH0X9667C26.jpg" },
   { name: "Psychological", gradient: "from-[#5E5CE6] to-[#66d2ff]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21519-9vH0X9667C26.jpg" },
 ];
-
-const SEARCH_Q = `
-  query ($search: String, $page: Int, $perPage: Int, $genres: [String], $sort: [MediaSort]) {
-    Page(page: $page, perPage: $perPage) {
-      media(search: $search, type: ANIME, genre_in: $genres, sort: $sort) {
-        id title { romaji english native } coverImage { extraLarge large color }
-        averageScore status seasonYear
-      }
-    }
-  }
-`;
 
 function useDebounce(val: string, ms: number) {
   const [d, setD] = useState(val);
@@ -53,9 +41,7 @@ function ExploreViewInner({ initialResults = [] }: { initialResults?: any[] }) {
   const initGenre = searchParams.get("genre") || "";
   const [query, setQuery] = useState(q);
   const [genre, setGenre] = useState(initGenre);
-  const [year, setYear] = useState("");
-  const [format, setFormat] = useState("");
-  const [sort, setSort] = useState("POPULARITY_DESC");
+  const [sort, setSort] = useState("popularity");
   const [results, setResults] = useState<any[]>(initialResults);
   const [loading, setLoading] = useState(false);
   const [searchHist, setSearchHist] = useState<string[]>([]);
@@ -72,49 +58,48 @@ function ExploreViewInner({ initialResults = [] }: { initialResults?: any[] }) {
   }, [initGenre]);
 
   useEffect(() => {
-    if (!dq && !genre && !year && !format && sort === "POPULARITY_DESC") {
+    if (!dq && !genre && sort === "popularity") {
       setResults(initialResults);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    const vars: any = { page: 1, perPage: 30, search: dq || undefined };
-    if (genre) vars.genres = [genre];
-    if (year) vars.seasonYear = parseInt(year);
-    if (format) vars.format = format;
-    if (dq && sort === "POPULARITY_DESC") {
-       vars.sort = ["SEARCH_MATCH", "POPULARITY_DESC"];
-    } else {
-       vars.sort = [sort];
-    }
+    
+    // We use our own api.browse instead of AniList so we only get mapped anime
+    const vars: any = { page: 1, sort: sort };
+    if (dq) vars.q = dq;
+    if (genre) vars.genre = genre;
 
-    api.anilist(SEARCH_Q, vars)
-      .then((data) => {
-        const media = data?.data?.Page?.media || [];
-        setResults(media.map((m: any) => ({
-          id: String(m.id),
-          title: m.title.english || m.title.romaji || m.title.native || "",
-          img: m.coverImage?.extraLarge || m.coverImage?.large,
-          score: m.averageScore,
-          color: m.coverImage?.color,
-          status: m.status,
-          seasonYear: m.seasonYear,
-        })));
-        
-        if (dq && media.length > 0) {
-          const updated = [dq, ...getSearchHist().filter((t) => t.toLowerCase() !== dq.toLowerCase())].slice(0, 10);
-          saveSearchHist(updated);
-          setSearchHist(updated);
+    api.browse(vars)
+      .then((res) => {
+        if (res?.success && res.data) {
+          setResults(res.data.map((m: any) => ({
+            id: String(m.anilistId),
+            title: m.cleanTitle || m.nativeTitle || "",
+            img: m.coverImage,
+            score: m.score,
+            color: m.color,
+            status: m.status,
+            seasonYear: m.year,
+          })));
+          
+          if (dq && res.data.length > 0) {
+            const updated = [dq, ...getSearchHist().filter((t) => t.toLowerCase() !== dq.toLowerCase())].slice(0, 10);
+            saveSearchHist(updated);
+            setSearchHist(updated);
+          }
+        } else {
+          setResults([]);
         }
       })
       .catch((err) => {
-        console.error("AniList Fetch Error:", err);
+        console.error("Fetch DB Error:", err);
         setResults([]);
       })
       .finally(() => setLoading(false));
 
-  }, [dq, genre, year, format, sort, initialResults]);
+  }, [dq, genre, sort, initialResults]);
 
   return (
     <div className="w-full pb-32">

@@ -369,12 +369,16 @@ async def browse_anime(
     genre: str = Query(None),
     status: str = Query(None, pattern="^(RELEASING|FINISHED|NOT_YET_RELEASED)$"),
     limit: int = Query(24, le=50),
+    q: str = Query(None, description="Search query"),
 ):
     response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
     """Browse full anime catalog from database, with filter and sorting."""
     conditions = ['1=1']
     values = {"offset": (page - 1) * limit, "limit": limit}
     
+    if q:
+        conditions.append("meta.\"cleanTitle\" ILIKE :q OR meta.\"nativeTitle\" ILIKE :q")
+        values["q"] = f"%{q}%"
     if genre:
         # Use simple ILIKE for JSONB array of strings or text representation
         conditions.append("meta.genres::text ILIKE :genre")

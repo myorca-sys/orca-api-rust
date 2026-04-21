@@ -5,13 +5,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 from db.connection import database
 from sqlalchemy import text
+from schemas.sync import SyncEpisodePayload
 
 router = APIRouter()
-
-class SyncEpisodePayload(BaseModel):
-    slug: str
-    episode: float
-    tg_urls: Optional[List[str]] = None
 
 @router.post("/sync-episode")
 async def sync_episode_db(payload: SyncEpisodePayload):

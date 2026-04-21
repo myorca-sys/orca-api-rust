@@ -51,15 +51,33 @@ async def _resolve_embed(embed: dict, source_tag: str) -> Optional[dict]:
     url = embed.get('url') or embed.get('resolved', '')
     if not url: return None
     try:
-        async with asyncio.timeout(EXTRACTOR_TIMEOUT):
-            resolved = await extractor.extract_raw_video(url)
+        if embed.get('type') == 'direct':
+            resolved = url
+        else:
+            async with asyncio.timeout(EXTRACTOR_TIMEOUT):
+                resolved = await extractor.extract_raw_video(url)
+            
+        is_direct = embed.get('type') == 'direct' or resolved.endswith(('.m3u8', '.mp4')) or 'videoplayback' in resolved or 'workers.dev' in resolved or 'tg-proxy' in resolved
+        quality = determine_quality(embed.get('quality', 'Auto'))
+        
+        # Wrap mp4upload or other direct links with our CF proxy to bypass CORS / Referer restrictions
+        if is_direct and 'workers.dev' not in resolved and 'tg-proxy' not in resolved:
+            # Let's import sign_stream_url
+            try:
+                from utils.signed_url import sign_stream_url
+                # Identify proxy provider tag based on the URL or source tag
+                provider_for_proxy = "mp4upload" if "mp4upload" in url else source_tag
+                resolved = sign_stream_url(resolved, provider_for_proxy, quality)
+            except Exception as e:
+                print(f"Error wrapping signed url: {e}")
+
         return {
             'provider':  embed.get('provider', source_tag),
             'domain':    extract_domain(resolved),
-            'quality':   determine_quality(embed.get('quality', 'Auto')),
+            'quality':   quality,
             'url':       resolved,
             'embed_url': url,
-            'type':      'direct' if resolved.endswith(('.m3u8', '.mp4')) or 'videoplayback' in resolved else 'iframe',
+            'type':      'direct' if is_direct else 'iframe',
             'source':    source_tag,
         }
     except: return None

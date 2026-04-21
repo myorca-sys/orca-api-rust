@@ -1,20 +1,12 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from typing import Optional
 from db.connection import database
 from db.models import watch_events, episode_likes, activity_feed, follows, watch_history, anime_metadata
 from sqlalchemy import select, func, and_, desc, String
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from schemas.social import WatchProgressUpdate, WatchEventCreate, EpisodeLikeCreate
 
 router = APIRouter()
-
-class WatchProgressUpdate(BaseModel):
-    user_id: str
-    anilistId: int
-    episodeNumber: float
-    progressSeconds: int
-    durationSeconds: int
-    isCompleted: bool
 
 @router.get("/progress")
 async def get_watch_history(user_id: str):
@@ -54,18 +46,6 @@ async def update_watch_history(item: WatchProgressUpdate):
     )
     await database.execute(stmt)
     return {"success": True}
-
-class WatchEventCreate(BaseModel):
-    user_id: str
-    anilistId: int
-    episodeNumber: float
-    event_type: str # "start", "progress", "complete"
-    timestamp_sec: int
-
-class EpisodeLikeCreate(BaseModel):
-    user_id: str
-    anilistId: int
-    episodeNumber: float
 
 @router.post("/watch-event")
 async def record_watch_event(event: WatchEventCreate):

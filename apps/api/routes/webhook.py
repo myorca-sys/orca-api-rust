@@ -15,6 +15,10 @@ from services.pipeline import sync_anime_episodes
 from services.cleanup import cleanup_expired_cache, vacuum_old_episodes
 from services.prefetch import smart_prefetch_episodes
 from db.connection import database
+from db.models import users, payment_logs
+from datetime import datetime, timedelta
+import sqlalchemy
+import re
 
 # Inisialisasi Router (Hapus prefix ganda)
 router = APIRouter()
@@ -211,6 +215,116 @@ async def triage_webhook(request: Request):
     except Exception as e:
         print(f"[Webhook] Triage error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- 💰 BILLING WEBHOOK (Trakteer/Saweria) ---
+
+@router.post("/webhook/billing")
+async def billing_webhook(request: Request):
+    """
+    Handle incoming payments from Trakteer or Saweria.
+    Users should include "Username: your_name" in their message.
+    """
+    try:
+        data = await request.json()
+        print(f"[Billing] Incoming Webhook: {json.dumps(data)}")
+
+        provider = "unknown"
+        amount = 0
+        message = ""
+        external_id = None
+        
+        # 1. Parse Trakteer
+        if "supporter_message" in data:
+            provider = "trakteer"
+            amount = data.get("price", 0)
+            message = data.get("supporter_message", "")
+            external_id = data.get("tr_id")
+        
+        # 2. Parse Saweria
+        elif "message" in data and "amount_raw" in data:
+            provider = "saweria"
+            amount = data.get("amount_raw", 0)
+            message = data.get("message", "")
+            external_id = data.get("id")
+
+        if not external_id:
+            return Response(status_code=200, content="No transaction ID found")
+
+        # 3. Find User ID in message using Regex (Flexible: "User: name" or "Username: name")
+        user_id_match = re.search(r"(?:user|username|id):\s*([a-zA-Z0-9_\-]+)", message, re.IGNORECASE)
+        found_user_id = user_id_match.group(1) if user_id_match else None
+
+        # 4. Persistence & Logic
+        async with database.transaction():
+            # Check if already processed
+            query_check = sqlalchemy.select(payment_logs).where(payment_logs.c.external_id == str(external_id))
+            existing = await database.fetch_one(query_check)
+            if existing:
+                return Response(status_code=200, content="Already processed")
+
+            # Update User if found
+            if found_user_id:
+                # Calculate duration: Rp 15.000 = 30 days
+                # You can adjust this pricing as needed
+                days_to_add = int(amount / 500) 
+                
+                # Get current expiry or start from now
+                query_user = sqlalchemy.select(users).where(users.c.id == found_user_id)
+                user_data = await database.fetch_one(query_user)
+                
+                if user_data:
+                    current_expiry = user_data.subscription_expiry
+                    # current_expiry is a naive datetime or None from database
+                    now = datetime.now()
+                    start_date = current_expiry if (current_expiry and current_expiry > now) else now
+                    new_expiry = start_date + timedelta(days=days_to_add)
+
+                    update_query = sqlalchemy.update(users).where(users.c.id == found_user_id).values(
+                        tier="PRO",
+                        subscription_expiry=new_expiry
+                    )
+                    await database.execute(update_query)
+                    print(f"[Billing] User {found_user_id} upgraded to PRO until {new_expiry}")
+                else:
+                    print(f"[Billing] User {found_user_id} not found in DB")
+                    found_user_id = None # Reset so log knows it wasn't applied
+
+            # Log payment
+            insert_log = payment_logs.insert().values(
+                provider=provider,
+                external_id=str(external_id),
+                amount=float(amount),
+                message=message,
+                user_id=found_user_id,
+                status="processed" if found_user_id else "user_not_found",
+                raw_payload=data
+            )
+            await database.execute(insert_log)
+
+        # 5. Telegram Notification
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        if bot_token and chat_id:
+            status_emoji = "✅" if found_user_id else "⚠️"
+            tg_msg = (
+                f"💰 *New Payment Received!* {status_emoji}\n\n"
+                f"Provider: `{provider.upper()}`\n"
+                f"Amount: `Rp {amount:,.0f}`\n"
+                f"Message: `{message}`\n"
+                f"User: `{found_user_id or 'NOT FOUND'}`\n"
+                f"Status: `{'PRO Activated' if found_user_id else 'Manual Check Needed'}`"
+            )
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": tg_msg, "parse_mode": "Markdown"}
+                )
+
+        return Response(status_code=200, content="Payment Processed")
+    except Exception as e:
+        print(f"[Billing] Error: {e}")
+        traceback.print_exc()
+        return Response(status_code=200) # Always return 200 to prevent webhook retries
 
 @router.post("/webhook/telegram")
 async def telegram_webhook(request: Request):

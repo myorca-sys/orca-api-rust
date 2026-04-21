@@ -37,7 +37,7 @@ function EpisodeListInner({ episodes, animeId }: { episodes: Episode[]; animeId:
       {/* Grid of buttons for episodes */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
         {view.map((ep, i) => {
-          const epId = ep.url.replace(/\/$/, "").split("/").pop() || String(ep.number);
+          const epId = (ep.url || "").replace(/\/$/, "").split("/").pop() || String(ep.number);
           const w = mounted ? history.find((h) => h.animeSlug === animeId && h.episode.toString() === epId) : undefined;
           const pct = w && w.durationSec > 0 ? (w.timestampSec / w.durationSec) * 100 : 0;
           const isWatched = w?.completed;

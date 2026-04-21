@@ -3,7 +3,7 @@
 import WatchClient from "@/features/watch/WatchClient";
 import { API } from "@/core/lib/api";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 export const runtime = "edge";
 
 export default async function WatchPage({ params }: { params: Promise<{ id: string; episode: string }> }) {
@@ -28,7 +28,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
     if (anime) {
       animeDetails = anime;
       title = anime.cleanTitle ?? anime.nativeTitle ?? title;
-      poster = anime.coverImage ?? "";
+      poster = anime.bannerImage ?? anime.coverImage ?? "";
       recommendations = anime.recommendations ?? [];
       allEpisodes = (anime.episodes ?? []).map((e: any) => ({
         title: `Episode ${e.episodeNumber}`,

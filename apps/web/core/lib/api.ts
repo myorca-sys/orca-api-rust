@@ -52,9 +52,10 @@ export const api = {
   seriesList: (init?: RequestInit) => request<{ success: boolean; data: any[] }>("/api/series", init),
 
   /** Browse catalog from our DB */
-  browse: (params: { page?: number; genre?: string; sort?: string }, init?: RequestInit) => {
+  browse: (params: { page?: number; q?: string; genre?: string; sort?: string }, init?: RequestInit) => {
     const q = new URLSearchParams();
     if (params.page) q.set("page", String(params.page));
+    if (params.q) q.set("q", params.q);
     if (params.genre) q.set("genre", params.genre);
     if (params.sort) q.set("sort", params.sort);
     return request<{ success: boolean; page: number; data: any[] }>(`/api/v2/browse?${q.toString()}`, init);
