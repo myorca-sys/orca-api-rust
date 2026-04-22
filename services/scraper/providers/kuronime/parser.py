@@ -36,7 +36,6 @@ class KuronimeParser(BaseParser):
             })
             
         # Extract Local Metadata
-        info_box = soup.select_one('.infox') or soup.select_one('.info-content')
         air_day = None
         genres_local = []
         score_local = None
@@ -45,40 +44,53 @@ class KuronimeParser(BaseParser):
         studio = None
         status_local = None
 
-        if info_box:
-            for span in info_box.find_all(['span', 'b', 'div', 'li']):
-                text = span.get_text(strip=True)
-                lower_text = text.lower()
-                if 'hari rilis' in lower_text or 'hari tayang' in lower_text:
-                    air_day = text.split(':', 1)[-1].strip()
-                elif 'genre' in lower_text:
-                    a_tags = span.find_all('a')
-                    if a_tags:
-                        genres_local = [a.get_text(strip=True) for a in a_tags]
-                    else:
-                        genres_local = [g.strip() for g in text.split(':', 1)[-1].split(',')]
-                elif 'skor' in lower_text or 'score' in lower_text:
+        # Look for views/followers (e.g. Diikuti 372 orang or post-views-count)
+        bmc_div = soup.select_one('.bmc')
+        if bmc_div:
+            v_match = re.search(r'([\d,.]+)', bmc_div.get_text(strip=True))
+            if v_match:
+                try:
+                    views_local = int(v_match.group(1).replace(',', '').replace('.', ''))
+                except:
+                    pass
+        else:
+            view_span = soup.select_one('.post-views-count')
+            if view_span:
+                v_match = re.search(r'([\d,.]+)', view_span.get_text(strip=True))
+                if v_match:
                     try:
-                        score_match = re.search(r'([\d.]+)', text.split(':', 1)[-1])
-                        if score_match:
-                            score_local = float(score_match.group(1))
-                    except Exception:
-                        pass
-                elif 'dilihat' in lower_text or 'views' in lower_text:
-                    try:
-                        v = re.search(r'([\d,.]+)', text.split(':', 1)[-1])
-                        if v:
-                            views_local = int(v.group(1).replace(',', '').replace('.', ''))
+                        views_local = int(v_match.group(1).replace(',', '').replace('.', ''))
                     except:
                         pass
-                elif 'total episode' in lower_text or 'episodes' in lower_text:
-                    m = re.search(r'\d+', text.split(':', 1)[-1])
-                    if m: total_episodes = int(m.group())
-                elif 'studio' in lower_text:
-                    studio = text.split(':', 1)[-1].strip()
-                elif 'status' in lower_text:
-                    status_local = text.split(':', 1)[-1].strip()
-                    
+
+        # Look for other metadata like studio, status, genre, score
+        # In Kuronime, they often use <b>Tag Name:</b> Value
+        for b_tag in soup.find_all(['b', 'strong', 'span']):
+            text = b_tag.parent.get_text(strip=True) if b_tag.parent else ''
+            lower_text = text.lower()
+            if 'hari rilis' in lower_text or 'hari tayang' in lower_text:
+                air_day = text.split(':', 1)[-1].strip() if ':' in text else None
+            elif 'genre' in lower_text:
+                a_tags = b_tag.parent.find_all('a') if b_tag.parent else []
+                if a_tags:
+                    genres_local = [a.get_text(strip=True) for a in a_tags]
+                elif ':' in text:
+                    genres_local = [g.strip() for g in text.split(':', 1)[-1].split(',')]
+            elif 'skor' in lower_text or 'score' in lower_text or 'rating' in lower_text:
+                try:
+                    score_match = re.search(r'([\d.]+)', text.split(':', 1)[-1]) if ':' in text else re.search(r'([\d.]+)', text)
+                    if score_match:
+                        score_local = float(score_match.group(1))
+                except Exception:
+                    pass
+            elif 'total episode' in lower_text or 'jumlah episode' in lower_text:
+                m = re.search(r'\d+', text.split(':', 1)[-1]) if ':' in text else re.search(r'\d+', text)
+                if m: total_episodes = int(m.group())
+            elif 'studio' in lower_text:
+                studio = text.split(':', 1)[-1].strip() if ':' in text else None
+            elif 'status' in lower_text:
+                status_local = text.split(':', 1)[-1].strip() if ':' in text else None
+        
         return {
             "episodes": sorted(episodes, key=lambda x: x["number"], reverse=True),
             "poster": poster,

@@ -310,7 +310,7 @@ async def sync_anime_episodes(anilist_id: int) -> dict:
                                 if not current_genres or current_genres == "[]" or current_genres == []:
                                     await database.execute(
                                         "UPDATE canonical_anime SET genres_local = :g, last_reconciled_at = NOW() WHERE id = :cid",
-                                        {"g": genres_local, "cid": canonical_id}
+                                        {"g": genres_json, "cid": canonical_id}
                                     )
                                     
                             # 4. Score Local, Studio, Status Local, Views Local -> just record to metadata_sources for now
