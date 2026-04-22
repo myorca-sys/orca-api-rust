@@ -15,14 +15,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 QSTASH_URL = "https://qstash.upstash.io/v2/schedules"
-QSTASH_TOKEN = os.getenv("UPSTASH_QSTASH_TOKEN")
+QSTASH_TOKEN = os.getenv("QSTASH_TOKEN") or os.getenv("UPSTASH_QSTASH_TOKEN")
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 
 API_URL = "https://jonyyyyyyyu-anime-scraper-api.hf.space"
 
 def register_cron(endpoint, cron_expression, method="GET", extra_headers=None):
     if not QSTASH_TOKEN:
-        print("Error: UPSTASH_QSTASH_TOKEN environment variable is not set.")
+        print("Error: QSTASH_TOKEN environment variable is not set.")
         return
 
     headers = {
