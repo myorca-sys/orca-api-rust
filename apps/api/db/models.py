@@ -200,19 +200,6 @@ episode_likes = Table(
     UniqueConstraint("user_id", "anilistId", "episodeNumber", name="uq_episode_like_user"),
 )
 
-watch_events = Table(
-    "watch_events",
-    metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("user_id", String, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-    Column("anilistId", Integer, nullable=False),
-    Column("episodeNumber", Float, nullable=False),
-    Column("event_type", String, nullable=False),
-    Column("timestamp_sec", Integer, nullable=True),
-    Column("created_at", DateTime, nullable=False, server_default=func.now()),
-    Index("idx_watch_events_episode", "anilistId", "episodeNumber"),
-)
-
 # ── NEW: Domain 2 User Behavioral Data ───────────────────────────────────────
 
 watch_sessions = Table(

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from db.connection import database
-from db.models import watch_events, episode_likes, activity_feed, follows, watch_history, anime_metadata, watch_sessions
+from db.models import episode_likes, activity_feed, follows, watch_history, anime_metadata, watch_sessions
 from sqlalchemy import select, func, and_, desc, String
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from schemas.social import WatchProgressUpdate, WatchEventCreate, EpisodeLikeCreate
@@ -76,16 +76,6 @@ async def update_watch_history(item: WatchProgressUpdate):
 
 @router.post("/watch-event")
 async def record_watch_event(event: WatchEventCreate):
-    # Insert watch event (legacy flat tracking)
-    stmt = pg_insert(watch_events).values(
-        user_id=event.user_id,
-        anilistId=event.anilistId,
-        episodeNumber=event.episodeNumber,
-        event_type=event.event_type,
-        timestamp_sec=event.timestamp_sec
-    )
-    await database.execute(stmt)
-    
     # Upsert to Domain 2 structured tracking (watch_sessions)
     session_id = f"{event.user_id}_{event.anilistId}_{event.episodeNumber}"
     is_completed = 1.0 if event.event_type == "complete" else 0.0
@@ -123,13 +113,12 @@ async def record_watch_event(event: WatchEventCreate):
 
 @router.get("/anime/{anilistId}/stats")
 async def get_anime_stats(anilistId: int, user_id: Optional[str] = None):
-    # Total watch count (unique combinations of user_id and episodeNumber where event_type='complete')
-    # Or just count all unique watchers. Let's count unique (user_id, episode) for total episode views
+    # Total watch count (unique watchers and total views) using watch_sessions
     watch_query = """
     SELECT COUNT(DISTINCT user_id) as total_watchers, 
-           COUNT(DISTINCT CONCAT(user_id, '-', "episodeNumber")) as total_episode_views
-    FROM watch_events
-    WHERE "anilistId" = :anilistId
+           COUNT(DISTINCT session_id) as total_episode_views
+    FROM watch_sessions
+    WHERE "anilist_id" = :anilistId
     """
     stats = await database.fetch_one(query=watch_query, values={"anilistId": anilistId})
     

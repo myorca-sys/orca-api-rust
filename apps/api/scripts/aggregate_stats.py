@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 async def aggregate_stats():
     """
-    Aggregates raw watch_events into daily_anime_stats and user_watch_stats.
+    Aggregates raw watch_sessions into daily_anime_stats and user_watch_stats.
     This should be run via a cron job (e.g., hourly or daily).
     """
     await database.connect()
@@ -22,19 +22,19 @@ async def aggregate_stats():
         logger.info("Starting data aggregation pipeline...")
         
         # 1. Aggregate Daily Anime Stats
-        # We roll up watch events into daily stats. 
+        # We roll up watch sessions into daily stats. 
         # Using simple heuristics: 1 unique user = 10 popularity, 1 view = 2 trending
         logger.info("Aggregating daily anime stats...")
         query_anime_stats = """
             INSERT INTO daily_anime_stats ("anilistId", "date", "views", "popularity", "trending")
             SELECT 
-                "anilistId", 
-                DATE("created_at") as "date",
-                COUNT(id) as "views",
+                "anilist_id" as "anilistId", 
+                DATE("started_at") as "date",
+                COUNT(session_id) as "views",
                 COUNT(DISTINCT "user_id") * 10 as "popularity",
-                COUNT(id) * 2 as "trending"
-            FROM watch_events
-            GROUP BY "anilistId", DATE("created_at")
+                COUNT(session_id) * 2 as "trending"
+            FROM watch_sessions
+            GROUP BY "anilist_id", DATE("started_at")
             ON CONFLICT ("anilistId", "date") 
             DO UPDATE SET 
                 views = EXCLUDED.views,

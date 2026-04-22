@@ -191,7 +191,7 @@ async def ingest_stats():
 async def force_db_setup():
     try:
         from db.connection import metadata
-        from db.models import users, comments, comment_reactions, follows, notifications, watch_events
+        from db.models import users, comments, comment_reactions, follows, notifications
         from sqlalchemy.ext.asyncio import create_async_engine
         import os
         db_url = os.getenv("DATABASE_URL")
@@ -272,6 +272,13 @@ async def trigger_aggregate_stats(background_tasks: BackgroundTasks):
     from scripts.aggregate_stats import aggregate_stats
     background_tasks.add_task(aggregate_stats)
     return {"success": True, "message": "Aggregation pipeline started in background"}
+
+
+@app.post("/api/v2/admin/cron/health-check", tags=["Admin", "Cron"], dependencies=[Depends(verify_admin_key)])
+async def trigger_health_check(background_tasks: BackgroundTasks):
+    from scripts.active_health_check import run_active_health_check
+    background_tasks.add_task(run_active_health_check)
+    return {"success": True, "message": "Active health check started in background"}
 
 
 @app.get("/debug/columns/{table_name}", tags=["Debug"], dependencies=[Depends(verify_admin_key)])
