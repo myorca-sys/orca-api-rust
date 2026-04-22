@@ -62,10 +62,10 @@ async def aggregate_stats():
             INSERT INTO user_watch_stats ("user_id", "total_anime_watched", "total_episodes_watched", "total_watch_time_sec")
             SELECT 
                 "user_id",
-                COUNT(DISTINCT "anilistId") as "total_anime_watched",
-                COUNT(DISTINCT CONCAT("anilistId", '-', "episodeNumber")) as "total_episodes_watched",
-                SUM("timestamp_sec") as "total_watch_time_sec"
-            FROM watch_events
+                COUNT(DISTINCT "anilist_id") as "total_anime_watched",
+                COUNT(DISTINCT CONCAT("anilist_id", '-', "episode_number")) as "total_episodes_watched",
+                SUM("watch_duration_sec") as "total_watch_time_sec"
+            FROM watch_sessions
             GROUP BY "user_id"
             ON CONFLICT ("user_id") 
             DO UPDATE SET 

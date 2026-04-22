@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from db.connection import database
-from db.models import watch_events, episode_likes, activity_feed, follows, watch_history, anime_metadata
+from db.models import watch_events, episode_likes, activity_feed, follows, watch_history, anime_metadata, watch_sessions
 from sqlalchemy import select, func, and_, desc, String
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from schemas.social import WatchProgressUpdate, WatchEventCreate, EpisodeLikeCreate
@@ -45,11 +45,38 @@ async def update_watch_history(item: WatchProgressUpdate):
         }
     )
     await database.execute(stmt)
+    
+    # Also upsert to watch_sessions domain 2 table
+    session_id = f"{item.user_id}_{item.anilistId}_{item.episodeNumber}"
+    is_completed = 1.0 if item.isCompleted else (item.progressSeconds / item.durationSeconds if item.durationSeconds > 0 else 0.0)
+    
+    session_stmt = pg_insert(watch_sessions).values(
+        session_id=session_id,
+        user_id=item.user_id,
+        anilist_id=item.anilistId,
+        episode_number=item.episodeNumber,
+        watch_duration_sec=item.progressSeconds,
+        total_duration_sec=item.durationSeconds,
+        drop_timestamp_sec=item.progressSeconds,
+        completion_rate=is_completed,
+        ended_at=func.now()
+    ).on_conflict_do_update(
+        index_elements=["session_id"],
+        set_={
+            "watch_duration_sec": func.greatest(watch_sessions.c.watch_duration_sec, item.progressSeconds),
+            "total_duration_sec": item.durationSeconds,
+            "drop_timestamp_sec": item.progressSeconds,
+            "completion_rate": func.greatest(watch_sessions.c.completion_rate, is_completed),
+            "ended_at": func.now()
+        }
+    )
+    await database.execute(session_stmt)
+    
     return {"success": True}
 
 @router.post("/watch-event")
 async def record_watch_event(event: WatchEventCreate):
-    # Insert watch event
+    # Insert watch event (legacy flat tracking)
     stmt = pg_insert(watch_events).values(
         user_id=event.user_id,
         anilistId=event.anilistId,
@@ -58,6 +85,30 @@ async def record_watch_event(event: WatchEventCreate):
         timestamp_sec=event.timestamp_sec
     )
     await database.execute(stmt)
+    
+    # Upsert to Domain 2 structured tracking (watch_sessions)
+    session_id = f"{event.user_id}_{event.anilistId}_{event.episodeNumber}"
+    is_completed = 1.0 if event.event_type == "complete" else 0.0
+    
+    session_stmt = pg_insert(watch_sessions).values(
+        session_id=session_id,
+        user_id=event.user_id,
+        anilist_id=event.anilistId,
+        episode_number=event.episodeNumber,
+        watch_duration_sec=event.timestamp_sec,
+        drop_timestamp_sec=event.timestamp_sec,
+        completion_rate=is_completed,
+        ended_at=func.now()
+    ).on_conflict_do_update(
+        index_elements=["session_id"],
+        set_={
+            "watch_duration_sec": func.greatest(watch_sessions.c.watch_duration_sec, event.timestamp_sec),
+            "drop_timestamp_sec": event.timestamp_sec,
+            "completion_rate": func.greatest(watch_sessions.c.completion_rate, is_completed),
+            "ended_at": func.now()
+        }
+    )
+    await database.execute(session_stmt)
     
     # If completed, add to activity feed
     if event.event_type == "complete":

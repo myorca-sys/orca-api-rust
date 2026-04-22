@@ -267,6 +267,13 @@ async def trigger_resync_missing(background_tasks: BackgroundTasks):
     return {"success": True, "message": "Resync missing episodes started in background"}
 
 
+@app.post("/api/v2/admin/cron/aggregate", tags=["Admin", "Cron"], dependencies=[Depends(verify_admin_key)])
+async def trigger_aggregate_stats(background_tasks: BackgroundTasks):
+    from scripts.aggregate_stats import aggregate_stats
+    background_tasks.add_task(aggregate_stats)
+    return {"success": True, "message": "Aggregation pipeline started in background"}
+
+
 @app.get("/debug/columns/{table_name}", tags=["Debug"], dependencies=[Depends(verify_admin_key)])
 async def get_columns(table_name: str):
     try:

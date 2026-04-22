@@ -213,6 +213,27 @@ watch_events = Table(
     Index("idx_watch_events_episode", "anilistId", "episodeNumber"),
 )
 
+# ── NEW: Domain 2 User Behavioral Data ───────────────────────────────────────
+
+watch_sessions = Table(
+    "watch_sessions",
+    metadata,
+    Column("session_id", String, primary_key=True),
+    Column("user_id", String, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("anilist_id", Integer, ForeignKey("anime_metadata.anilistId", ondelete="CASCADE"), nullable=False),
+    Column("episode_number", Float, nullable=False),
+    Column("started_at", DateTime, nullable=False, server_default=func.now()),
+    Column("ended_at", DateTime, nullable=False, server_default=func.now()),
+    Column("watch_duration_sec", Integer, default=0),
+    Column("total_duration_sec", Integer, default=0),
+    Column("completion_rate", Float, default=0.0),
+    Column("drop_timestamp_sec", Integer, default=0),
+    Column("quality_watched", String, default="Auto"),
+    Column("provider_used", String, nullable=True),
+    Index("idx_watch_sessions_user", "user_id"),
+    Index("idx_watch_sessions_anime", "anilist_id", "episode_number"),
+)
+
 # ── NEW: Persistent Watch History for Progress Sync ───────────────────────────
 
 collections = Table(
