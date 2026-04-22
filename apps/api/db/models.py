@@ -255,3 +255,33 @@ user_watch_stats = Table(
     Column("updatedAt", DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
     UniqueConstraint("user_id", name="uq_user_watch_stats"),
 )
+
+# ── NEW: Domain 1 Canonical & Metadata Sources ───────────────────────────────
+
+canonical_anime = Table(
+    "canonical_anime",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("anilist_id", Integer, ForeignKey("anime_metadata.anilistId", ondelete="CASCADE"), unique=True, nullable=False),
+    Column("mal_id", Integer),
+    Column("kitsu_id", Integer),
+    Column("title_preferred", Text, nullable=False),
+    Column("episode_count_actual", Integer),
+    Column("air_schedule_wib", Text),
+    Column("genres_local", JSONB),
+    Column("confidence_score", Float, default=0.0),
+    Column("last_reconciled_at", DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+)
+
+metadata_sources = Table(
+    "metadata_sources",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("canonical_id", Integer, ForeignKey("canonical_anime.id", ondelete="CASCADE"), nullable=False),
+    Column("source_name", String, nullable=False), # e.g., "anilist", "oploverz_scrape"
+    Column("field_name", String, nullable=False),  # e.g., "episode_count"
+    Column("raw_value", Text),
+    Column("confidence", Float, default=0.0),
+    Column("fetched_at", DateTime, nullable=False, server_default=func.now()),
+    Index("idx_metadata_sources_canonical", "canonical_id", "source_name", "field_name"),
+)

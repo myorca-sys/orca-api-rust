@@ -249,6 +249,35 @@ async def sync_anime_episodes(anilist_id: int) -> dict:
                     detail = await provider.get_anime_detail(series_url)
                     raw_episodes = detail.get("episodes", [])
                     print(f"[Pipeline Debug] Fetched {len(raw_episodes)} episodes from {series_url}")
+                    
+                    # Domain 1: Record Metadata Source (Episode Count)
+                    try:
+                        from services.reconciler import reconciler
+                        canonical_row = await database.fetch_one(
+                            "SELECT id, episode_count_actual FROM canonical_anime WHERE anilist_id = :id",
+                            {"id": anilist_id}
+                        )
+                        if canonical_row:
+                            canonical_id = canonical_row["id"]
+                            current_actual = canonical_row["episode_count_actual"]
+                            fetched_count = len(raw_episodes)
+                            
+                            await reconciler.record_metadata_source(
+                                canonical_id=canonical_id,
+                                source_name=f"{provider_id}_scrape",
+                                field_name="episode_count",
+                                raw_value=str(fetched_count),
+                                confidence=0.9
+                            )
+                            
+                            # Provider wins for episode count if it's larger or not set
+                            if current_actual is None or fetched_count > current_actual:
+                                await database.execute(
+                                    "UPDATE canonical_anime SET episode_count_actual = :cnt, last_reconciled_at = NOW() WHERE id = :cid",
+                                    {"cnt": fetched_count, "cid": canonical_id}
+                                )
+                    except Exception as e:
+                        print(f"[Pipeline] Failed to record metadata source: {e}")
 
                     sem = asyncio.Semaphore(5)
                     count = 0

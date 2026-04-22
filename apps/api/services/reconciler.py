@@ -236,6 +236,82 @@ class AnimeReconciler:
                 pass
         return migrated
 
+    async def sync_canonical_metadata(self, anilist_id: int, anilist_data: dict):
+        """
+        Upserts the canonical_anime table with AniList as the base truth,
+        and records the metadata source in metadata_sources.
+        """
+        # 1. Upsert canonical_anime
+        title_preferred = anilist_data.get("cleanTitle") or anilist_data.get("nativeTitle") or "Unknown"
+        episode_count = anilist_data.get("totalEpisodes")
+        genres = anilist_data.get("genres")
+        
+        # Check if canonical_anime exists
+        row = await database.fetch_one(
+            "SELECT id FROM canonical_anime WHERE anilist_id = :id",
+            {"id": anilist_id}
+        )
+        
+        canonical_id = None
+        if row:
+            canonical_id = row["id"]
+            # We don't overwrite episode_count_actual or genres_local if they exist,
+            # we rely on the reconciliation job to update them. But we can update title_preferred if needed.
+            await database.execute(
+                """
+                UPDATE canonical_anime 
+                SET title_preferred = :title, last_reconciled_at = NOW()
+                WHERE id = :cid
+                """,
+                {"title": title_preferred, "cid": canonical_id}
+            )
+        else:
+            query = """
+                INSERT INTO canonical_anime (anilist_id, title_preferred, episode_count_actual, genres_local)
+                VALUES (:anilist_id, :title, :eps, :genres)
+                RETURNING id
+            """
+            import json
+            canonical_id = await database.execute(
+                query,
+                {
+                    "anilist_id": anilist_id,
+                    "title": title_preferred,
+                    "eps": episode_count,
+                    "genres": json.dumps(genres) if genres else "[]"
+                }
+            )
+            
+        # 2. Record metadata source for AniList
+        if canonical_id:
+            await self.record_metadata_source(
+                canonical_id=canonical_id,
+                source_name="anilist",
+                field_name="episode_count",
+                raw_value=str(episode_count) if episode_count is not None else "",
+                confidence=0.8  # AniList base confidence
+            )
+            await self.record_metadata_source(
+                canonical_id=canonical_id,
+                source_name="anilist",
+                field_name="title",
+                raw_value=title_preferred,
+                confidence=1.0  # AniList title is canonical
+            )
+
+    async def record_metadata_source(self, canonical_id: int, source_name: str, field_name: str, raw_value: str, confidence: float):
+        query = """
+            INSERT INTO metadata_sources (canonical_id, source_name, field_name, raw_value, confidence, fetched_at)
+            VALUES (:cid, :src, :field, :val, :conf, NOW())
+        """
+        await database.execute(query, {
+            "cid": canonical_id,
+            "src": source_name,
+            "field": field_name,
+            "val": raw_value,
+            "conf": confidence
+        })
+
     async def reconcile(
         self,
         provider_id:   str,
@@ -329,6 +405,10 @@ class AnimeReconciler:
                         candidate.anilist_id  = old_id
                         candidate.confidence  = score
                         candidate.matched_via = "gemini_uncertain"
+
+                        if anilist_data:
+                            await self.sync_canonical_metadata(old_id, anilist_data)
+
                         return ReconciliationResult(
                             canonical_anilist_id=old_id,
                             canonical_title=old_title,
@@ -342,6 +422,9 @@ class AnimeReconciler:
                 candidate.anilist_id  = new_id
                 candidate.confidence  = score
                 candidate.matched_via = matched_via
+
+            if anilist_data:
+                await self.sync_canonical_metadata(new_id, anilist_data)
 
             return ReconciliationResult(
                 canonical_anilist_id=new_id,
@@ -369,14 +452,18 @@ class AnimeReconciler:
             candidate.confidence  = score
             candidate.matched_via = matched_via
 
+            if anilist_data:
+                await self.sync_canonical_metadata(new_id, anilist_data)
+
             return ReconciliationResult(
-            canonical_anilist_id=new_id,
-            canonical_title=new_title,
-            anilist_metadata=anilist_data, # Data is now attached here
-            providers=[candidate],
-            conflicts_resolved=conflicts_resolved,
-            migrated_records=migrated,
+                canonical_anilist_id=new_id,
+                canonical_title=new_title,
+                anilist_metadata=anilist_data,
+                providers=[candidate],
+                conflicts_resolved=conflicts_resolved,
+                migrated_records=migrated,
             )
+
     async def reconcile_batch(
         self,
         items: list[dict],
