@@ -40,6 +40,7 @@ class KuronimeParser(BaseParser):
         air_day = None
         genres_local = []
         score_local = None
+        views_local = None
         total_episodes = None
         studio = None
         status_local = None
@@ -63,6 +64,13 @@ class KuronimeParser(BaseParser):
                             score_local = float(score_match.group(1))
                     except Exception:
                         pass
+                elif 'dilihat' in lower_text or 'views' in lower_text:
+                    try:
+                        v = re.search(r'([\d,.]+)', text.split(':', 1)[-1])
+                        if v:
+                            views_local = int(v.group(1).replace(',', '').replace('.', ''))
+                    except:
+                        pass
                 elif 'total episode' in lower_text or 'episodes' in lower_text:
                     m = re.search(r'\d+', text.split(':', 1)[-1])
                     if m: total_episodes = int(m.group())
@@ -78,6 +86,7 @@ class KuronimeParser(BaseParser):
             "air_day": air_day,
             "genres_local": genres_local,
             "score_local": score_local,
+            "views_local": views_local,
             "total_episodes": total_episodes,
             "studio": studio,
             "status_local": status_local

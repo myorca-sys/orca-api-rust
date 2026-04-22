@@ -14,6 +14,7 @@ class AnimeDetail(TypedDict):
     air_day: str | None
     genres_local: list[str]
     score_local: float | None
+    views_local: int | None
     total_episodes: int | None
     studio: str | None
     status_local: str | None

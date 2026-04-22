@@ -6,7 +6,7 @@ router = APIRouter()
 
 @router.get("/v2/home")
 async def get_home_v2(response: Response):
-    response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=120"
     """
     Return homepage data exclusively from our database (datacenter).
     Ensures we only show anime that actually exist in our DB and have episodes.
@@ -18,7 +18,7 @@ async def get_home_v2(response: Response):
         SELECT m."anilistId", 
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."synopsis", m."score", m."nextAiringEpisode",
-               COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0) as local_trending
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0) as local_trending
         FROM anime_metadata m
         LEFT JOIN canonical_anime c ON m."anilistId" = c.anilist_id
         WHERE EXISTS (SELECT 1 FROM episodes e WHERE e."anilistId" = m."anilistId")
@@ -119,7 +119,7 @@ async def get_home_v2(response: Response):
         SELECT m."anilistId", 
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."score",
-               COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0) as local_trending
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0) as local_trending
         FROM anime_metadata m
         LEFT JOIN canonical_anime c ON m."anilistId" = c.anilist_id
         WHERE EXISTS (SELECT 1 FROM episodes e WHERE e."anilistId" = m."anilistId")

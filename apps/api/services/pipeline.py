@@ -313,8 +313,8 @@ async def sync_anime_episodes(anilist_id: int) -> dict:
                                         {"g": genres_local, "cid": canonical_id}
                                     )
                                     
-                            # 4. Score Local, Studio, Status Local -> just record to metadata_sources for now
-                            for field_name in ["score_local", "studio", "status_local"]:
+                            # 4. Score Local, Studio, Status Local, Views Local -> just record to metadata_sources for now
+                            for field_name in ["score_local", "studio", "status_local", "views_local"]:
                                 val = detail.get(field_name)
                                 if val:
                                     await reconciler.record_metadata_source(
