@@ -22,6 +22,26 @@ if [ -z "$FILES" ]; then
   exit 0
 fi
 
+# Check for garbage files (logs and root throwaway scripts)
+for FILE in $FILES; do
+  if [[ "$FILE" == *.log ]]; then
+    echo "❌ ERROR: Committing log files (*.log) is blocked!"
+    echo "File: $FILE"
+    echo "Please add it to .gitignore or remove it."
+    exit 1
+  fi
+  # Prevent .py and .js files in the root dir from being committed
+  if [[ "$FILE" == *.py ]] || [[ "$FILE" == *.js ]]; then
+    # if there is no slash in the file path, it's in the root dir
+    if [[ "$FILE" != */* ]]; then
+      echo "❌ ERROR: Committing Python/JS scripts to the root directory is blocked to keep it clean!"
+      echo "File: $FILE"
+      echo "Please move it to scripts/playground/ or another appropriate directory."
+      exit 1
+    fi
+  fi
+done
+
 for PATTERN in "${PATTERNS[@]}"; do
   # Use grep on the diff of staged files
   MATCHES=$(git diff --cached --color=never $against -- $FILES | grep -E "^\+" | grep -E "$PATTERN")

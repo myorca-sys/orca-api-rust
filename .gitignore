@@ -66,3 +66,7 @@ venv/
 __pycache__/
 tmp_ingest/
 apps/web/.env.production
+
+# playground / local scripts
+scripts/playground/
+*.log
