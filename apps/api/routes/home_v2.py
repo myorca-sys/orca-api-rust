@@ -19,11 +19,15 @@ async def get_home_v2(response: Response):
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."synopsis", m."score",
                (SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'score_local') as local_score, m."nextAiringEpisode",
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0) as jikan_views,
                COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0) as local_trending
         FROM anime_metadata m
         LEFT JOIN canonical_anime c ON m."anilistId" = c.anilist_id
         WHERE EXISTS (SELECT 1 FROM episodes e WHERE e."anilistId" = m."anilistId")
-        ORDER BY local_trending DESC, m.trending DESC NULLS LAST, m.popularity DESC NULLS LAST, m.score DESC NULLS LAST
+        ORDER BY GREATEST(
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId" AND date >= CURRENT_DATE - INTERVAL '7 days'), 0),
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0)
+        ) DESC, m.trending DESC NULLS LAST, m.popularity DESC NULLS LAST, m.score DESC NULLS LAST
         LIMIT 10
     '''
     
@@ -32,11 +36,15 @@ async def get_home_v2(response: Response):
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."score",
                (SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'score_local') as local_score, m."nextAiringEpisode",
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0) as jikan_views,
                COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId"), 0) as local_views
         FROM anime_metadata m
         LEFT JOIN canonical_anime c ON m."anilistId" = c.anilist_id
         WHERE m.status = 'RELEASING' AND EXISTS (SELECT 1 FROM episodes e WHERE e."anilistId" = m."anilistId")
-        ORDER BY local_views DESC, m.popularity DESC NULLS LAST
+        ORDER BY GREATEST(
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId"), 0),
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0)
+        ) DESC, m.popularity DESC NULLS LAST
         LIMIT 20
     '''
     
@@ -62,11 +70,15 @@ async def get_home_v2(response: Response):
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."score",
                (SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'score_local') as local_score,
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0) as jikan_views,
                COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId"), 0) as local_views
         FROM anime_metadata m
         LEFT JOIN canonical_anime c ON m."anilistId" = c.anilist_id
         WHERE EXISTS (SELECT 1 FROM episodes e WHERE e."anilistId" = m."anilistId")
-        ORDER BY local_views DESC, m.popularity DESC NULLS LAST, m.score DESC NULLS LAST
+        ORDER BY GREATEST(
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'views_local'), 0) + COALESCE((SELECT SUM(views) FROM daily_anime_stats d WHERE d."anilistId" = m."anilistId"), 0),
+            COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0)
+        ) DESC, m.popularity DESC NULLS LAST, m.score DESC NULLS LAST
         LIMIT 20
     '''
 
