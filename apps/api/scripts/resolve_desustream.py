@@ -16,6 +16,12 @@ async def resolve_desustream(url: str):
     
     async with httpx.AsyncClient(verify=False, follow_redirects=True, timeout=30.0) as client:
         res = await client.get(url, headers=headers)
+        
+        # If it redirected directly to Google Drive, return the final URL
+        if "drive.google" in str(res.url) or "drive.usercontent" in str(res.url):
+            print(f"\n✅ Langsung redirect ke Google Drive: {res.url}")
+            return str(res.url)
+            
         soup = BeautifulSoup(res.text, 'lxml')
         
         # Biasanya desustream memiliki script yang redirect atau tombol untuk diklik
