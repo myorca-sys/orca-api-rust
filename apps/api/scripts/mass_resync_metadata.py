@@ -21,6 +21,7 @@ async def mass_resync():
             FROM anime_metadata m
             WHERE EXISTS (SELECT 1 FROM anime_mappings map WHERE map."anilistId" = m."anilistId")
             ORDER BY m.popularity DESC NULLS LAST
+            LIMIT 500
         """
         rows = await database.fetch_all(query)
         anilist_ids = [row["anilistId"] for row in rows]

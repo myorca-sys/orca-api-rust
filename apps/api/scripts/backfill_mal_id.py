@@ -15,6 +15,7 @@ async def main():
         JOIN anime_metadata m ON m."anilistId" = c.anilist_id
         WHERE c.mal_id IS NULL
         ORDER BY m.popularity DESC NULLS LAST
+        LIMIT 500
     """
     rows = await database.fetch_all(query)
     print(f"Found {len(rows)} canonical animes missing mal_id. Prioritizing popular ones first.")
