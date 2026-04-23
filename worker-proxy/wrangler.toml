@@ -1,0 +1,5 @@
+name = "video-proxy"
+main = "src/index.js"
+compatibility_date = "2024-05-12"
+
+# workers_dev = true

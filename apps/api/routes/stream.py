@@ -49,6 +49,11 @@ async def stream_video_options():
 
 @router.get('/v1/stream')
 async def stream_video(url: str, request: Request):
+    # Parse custom Cookie injected by extractor (e.g. Gofile accountToken)
+    custom_cookie = None
+    if '|' in url:
+        url, custom_cookie = url.split('|', 1)
+        
     try:
         validate_scrape_url(url)
     except Exception as e:
@@ -58,6 +63,11 @@ async def stream_video(url: str, request: Request):
     headers = VIDEO_PROXY_HEADERS.copy()
     if range_header:
         headers["Range"] = range_header
+        
+    if custom_cookie:
+        headers["Cookie"] = custom_cookie
+        # Gofile also requires matching User-Agent and Referer
+        headers["Referer"] = "https://gofile.io/"
 
     # Special handling for HLS (.m3u8)
     if url.split('?')[0].endswith('.m3u8'):

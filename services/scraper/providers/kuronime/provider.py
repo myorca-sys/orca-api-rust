@@ -111,13 +111,20 @@ class KuronimeProvider(BaseProvider):
                 embeds = mirror_json.get("embed", {})
                 for res_key, res_providers in embeds.items():
                     quality = res_key.replace("v", "")
+                    
+                    # Filter only 720p and 1080p
+                    if quality not in ["720p", "1080p"]:
+                        continue
+                        
                     for provider_name, provider_url in res_providers.items():
                         if provider_url:
+                            # Pixeldrain works directly like Wibufile
+                            is_direct = "pixeldrain" in provider_url.lower()
                             sources.append({
                                 "provider": provider_name.capitalize(),
                                 "quality": quality,
                                 "url": provider_url,
-                                "type": "iframe"
+                                "type": "mp4 (direct)" if is_direct else "iframe"
                             })
             except Exception:
                 pass

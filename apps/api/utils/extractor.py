@@ -5,8 +5,73 @@ import time
 import random
 import string
 import asyncio
+import logging
+import yt_dlp
 from utils.ssrf_guard import SSRFSafeTransport
 from utils.tls_spoof import TLSSpoofTransport
+from utils.lockers_extractor import extract_gofile, build_client, LockerExtractionError
+
+# ── Konfigurasi yt-dlp yang ringan ──────────────────────────────────────────
+YDL_OPTS: dict = {
+    "skip_download": True,
+    "extract_flat": False,
+    "noplaylist": True,
+    "quiet": True,
+    "no_warnings": True,
+    "noprogress": True,
+    "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best[ext=mp4]/best",
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    },
+    "socket_timeout": 10,
+    "retries": 3,
+    "fragment_retries": 3,
+    "writesubtitles": False,
+    "writeautomaticsub": False,
+    "writethumbnail": False,
+    "writedescription": False,
+    "writeinfojson": False,
+    "writeannotations": False,
+    "embed_subs": False,
+    "embedthumbnail": False,
+    "addmetadata": False,
+    "cachedir": False,
+}
+
+def _extract_video_info_blocking(url: str) -> str:
+    """Fungsi synchronous (blocking) untuk memanggil yt-dlp."""
+    with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    if not info:
+        raise ValueError("yt-dlp mengembalikan info kosong")
+
+    video_url = None
+    formats = info.get("formats") or []
+
+    if formats:
+        mp4_formats = [
+            f for f in formats
+            if f.get("ext") == "mp4" and f.get("url") and f.get("vcodec") != "none"
+        ]
+        if mp4_formats:
+            best = max(mp4_formats, key=lambda f: (f.get("height") or 0))
+            video_url = best["url"]
+        else:
+            for f in reversed(formats):
+                if f.get("url"):
+                    video_url = f["url"]
+                    break
+
+    if not video_url:
+        video_url = info.get("url") or info.get("manifest_url")
+
+    if not video_url:
+        raise ValueError("Tidak ada URL video yang bisa diekstraksi dari halaman ini")
+
+    return video_url
 
 class SmartExtractor:
     """Generic fallback: cari .m3u8 / .mp4 URL dari HTML apapun"""
@@ -158,6 +223,18 @@ class UniversalExtractor:
                             return data['url']
                     except Exception:
                         pass
+            elif 'gofile.io' in url:
+                try:
+                    res = await extract_gofile(url, self.client)
+                    return f"{res.url}|{res.required_headers.get('Cookie','')}"
+                except LockerExtractionError as e:
+                    print(f"[Extractor] Gofile error: {e}")
+                    pass
+            elif 'pixeldrain.com' in url:
+                if "/u/" in url:
+                    file_id = url.split('/u/')[-1].split('?')[0]
+                    return f"https://pixeldrain.com/api/file/{file_id}"
+                return url
             elif '4meplayer' in url or 'oplo2.' in url:
                 # Coba dapat hash dari fragment
                 hash_id = url.split('#')[-1] if '#' in url else None
@@ -241,22 +318,18 @@ class UniversalExtractor:
                     if res_smart: return res_smart
                 except Exception as e:
                     print(f"[Extractor] TLS fallback error for mp4upload: {e}")
-            elif 'dood' in url or 'doodstream' in url:
-                res = await self.client.get(url)
-                html = res.text
-                pass_match = re.search(r'/pass_md5/[^\'\"]+', html)
-                if pass_match:
-                    base_url = f"https://{urllib.parse.urlparse(url).netloc}"
-                    pass_url = base_url + pass_match.group(0)
-                    res2 = await self.client.get(pass_url, headers={'Referer': url})
-                    token = res2.text
-                    rand = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-                    return f"{token}{rand}?token={pass_match.group(0).split('/')[-1]}&expiry={int(time.time())}"
-            elif 'filelions' in url or 'streamwish' in url:
-                res = await self.client.get(url)
-                match = re.search(r'file:\s*["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', res.text)
-                if match:
-                    return match.group(1)
+            elif 'dood' in url or 'doodstream' in url or 'filelions' in url or 'streamwish' in url or 'vidhide' in url:
+                try:
+                    # Leverage yt-dlp for heavily obfuscated hosts
+                    print(f"[Extractor] Using yt-dlp for {url}")
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(_extract_video_info_blocking, url),
+                        timeout=30.0
+                    )
+                    if result:
+                        return result
+                except Exception as e:
+                    print(f"[Extractor] yt-dlp extraction failed for {url}: {e}")
         except Exception as e:
             print(f"[Extractor] Error resolving {url}: {e}")
         

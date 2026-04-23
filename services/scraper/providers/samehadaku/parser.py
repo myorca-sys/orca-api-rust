@@ -112,12 +112,16 @@ class SamehadakuParser(BaseParser):
         for opt in soup.select('.east_player_option'):
             label = opt.select_one('span')
             label_text = label.get_text(strip=True) if label else 'Unknown'
+            quality = self._detect_quality(label_text)
+            
+            if quality not in ["720p", "1080p"]:
+                continue
             
             # Since we can't easily do AJAX yet without the correct action,
             # we store these as special sources that might need secondary resolving
             sources.append({
                 'provider': self._detect_provider(label_text),
-                'quality': self._detect_quality(label_text),
+                'quality': quality,
                 'url': f"ajax://{opt.get('data-post')}/{opt.get('data-nume')}/{opt.get('data-type')}",
                 'type': 'iframe'
             })
@@ -133,16 +137,21 @@ class SamehadakuParser(BaseParser):
                 if q_strong:
                     quality_label = q_strong.get_text(strip=True)
                 
+                quality = self._detect_quality(quality_label)
+                if quality not in ["720p", "1080p"]:
+                    continue
+                    
                 for a in li.select('span a'):
                     src_name = a.get_text(strip=True)
                     url = a.get('href')
                     
                     if url and 'http' in url:
+                        is_direct = "pixeldrain" in url.lower() or "wibufile" in url.lower()
                         sources.append({
                             'provider': f"{src_name} (DL)",
-                            'quality': self._detect_quality(quality_label),
+                            'quality': quality,
                             'url': url,
-                            'type': 'iframe' # Will be resolved by UniversalExtractor
+                            'type': 'mp4 (direct)' if is_direct else 'iframe' # Will be resolved by UniversalExtractor
                         })
                         
         return sources
