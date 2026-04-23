@@ -45,6 +45,7 @@ async def get_home_v2(response: Response):
                COALESCE(c.title_preferred, m."cleanTitle") as "cleanTitle", 
                m."nativeTitle", m."coverImage", m."bannerImage", m."score",
                (SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'score_local') as local_score,
+               COALESCE((SELECT MAX(raw_value::numeric) FROM metadata_sources ms WHERE ms.canonical_id = c.id AND ms.field_name = 'watching' AND ms.source_name = 'jikan_api'), 0) as jikan_views,
                max(e."episodeNumber") as "latestEpisode",
                max(e."updatedAt") as last_up
         FROM anime_metadata m
@@ -167,7 +168,9 @@ async def get_home_v2(response: Response):
             final_score = int(val * 10) if val <= 10 else int(val)
             
         # Get views (it might be aliased as local_views or local_trending)
-        views = d.get("local_views") or d.get("local_trending") or 0
+        local_v = d.get("local_views") or d.get("local_trending") or 0
+        jikan_v = d.get("jikan_views") or 0
+        final_views = max(int(local_v), int(jikan_v))
         
         return {
             "id": str(d["anilistId"]),
@@ -175,7 +178,7 @@ async def get_home_v2(response: Response):
             "img": d.get("coverImage"),
             "banner": d.get("bannerImage"),
             "score": final_score,
-            "views": int(views) if views else None,
+            "views": final_views if final_views else None,
             "synopsis": d.get("synopsis"),
             "nextAiringEpisode": d.get("nextAiringEpisode"),
             "url": f"/anime/{d['anilistId']}",
@@ -188,6 +191,16 @@ async def get_home_v2(response: Response):
         "success": True,
         "data": {
             "hero": [format_anime(r) for r in hero_rows],
+            "airing": [format_anime(r) for r in airing_rows],
+            "latest": [format_anime(r) for r in latest_rows],
+            "popular": [format_anime(r) for r in popular_rows],
+            "completed": [format_anime(r) for r in completed_rows],
+            "top_rated": [format_anime(r) for r in top_rated_rows],
+            "isekai": [format_anime(r) for r in isekai_rows],
+            "movies": [format_anime(r) for r in movies_rows],
+            "trending": [format_anime(r) for r in trending_rows],
+        }
+    }          "hero": [format_anime(r) for r in hero_rows],
             "airing": [format_anime(r) for r in airing_rows],
             "latest": [format_anime(r) for r in latest_rows],
             "popular": [format_anime(r) for r in popular_rows],
