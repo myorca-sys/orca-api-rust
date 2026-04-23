@@ -174,6 +174,11 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
             maxBufferSize: 30 * 1000 * 1000,
             enableWorker: true,
             lowLatencyMode: true,
+            // Agresif Fast-Load Options:
+            startFragPrefetch: true, // Langsung unduh fragmen pertama sebelum player siap
+            appendErrorMaxRetry: 3,
+            maxBufferLength: 10, // Kurangi buffer awal yang dibutuhkan untuk mulai memutar
+            maxStarvationDelay: 1, // Berapa lama boleh lapar data sebelum buffering
           });
           hlsRef.current = hls;
           hls.loadSource(src.url);
