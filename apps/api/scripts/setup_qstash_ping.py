@@ -69,5 +69,8 @@ if __name__ == "__main__":
         
         # 3. Active Provider Health Check (Every 15 minutes)
         register_cron("/api/v2/admin/cron/health-check", "*/15 * * * *", "POST", auth_headers)
+        
+        # 4. Sync Jikan API Stats (Weekly on Sunday at 01:00 UTC)
+        register_cron("/api/v2/admin/cron/sync-jikan", "0 1 * * 0", "POST", auth_headers)
     
     print("Done!")

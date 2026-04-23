@@ -288,6 +288,20 @@ async def trigger_mass_resync(background_tasks: BackgroundTasks):
     return {"success": True, "message": "Mass resync metadata started in background"}
 
 
+@app.post("/api/v2/admin/backfill-mal-id", tags=["Admin"], dependencies=[Depends(verify_admin_key)])
+async def trigger_backfill_mal_id(background_tasks: BackgroundTasks):
+    from scripts.backfill_mal_id import main as backfill_mal
+    background_tasks.add_task(backfill_mal)
+    return {"success": True, "message": "Backfill mal_id started in background"}
+
+
+@app.post("/api/v2/admin/cron/sync-jikan", tags=["Admin", "Cron"], dependencies=[Depends(verify_admin_key)])
+async def trigger_sync_jikan(background_tasks: BackgroundTasks):
+    from scripts.sync_jikan_stats import sync_jikan
+    background_tasks.add_task(sync_jikan)
+    return {"success": True, "message": "Jikan sync started in background"}
+
+
 @app.get("/debug/columns/{table_name}", tags=["Debug"], dependencies=[Depends(verify_admin_key)])
 async def get_columns(table_name: str):
     try:

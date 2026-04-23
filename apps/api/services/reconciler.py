@@ -245,6 +245,7 @@ class AnimeReconciler:
         title_preferred = anilist_data.get("cleanTitle") or anilist_data.get("nativeTitle") or "Unknown"
         episode_count = anilist_data.get("totalEpisodes")
         genres = anilist_data.get("genres")
+        mal_id = anilist_data.get("mal_id")
         
         # Check if canonical_anime exists
         row = await database.fetch_one(
@@ -260,15 +261,15 @@ class AnimeReconciler:
             await database.execute(
                 """
                 UPDATE canonical_anime 
-                SET title_preferred = :title, last_reconciled_at = NOW()
+                SET title_preferred = :title, mal_id = COALESCE(:mal_id, mal_id), last_reconciled_at = NOW()
                 WHERE id = :cid
                 """,
-                {"title": title_preferred, "cid": canonical_id}
+                {"title": title_preferred, "mal_id": mal_id, "cid": canonical_id}
             )
         else:
             query = """
-                INSERT INTO canonical_anime (anilist_id, title_preferred, episode_count_actual, genres_local)
-                VALUES (:anilist_id, :title, :eps, :genres)
+                INSERT INTO canonical_anime (anilist_id, title_preferred, episode_count_actual, genres_local, mal_id)
+                VALUES (:anilist_id, :title, :eps, :genres, :mal_id)
                 RETURNING id
             """
             import json
@@ -278,7 +279,8 @@ class AnimeReconciler:
                     "anilist_id": anilist_id,
                     "title": title_preferred,
                     "eps": episode_count,
-                    "genres": json.dumps(genres) if genres else "[]"
+                    "genres": json.dumps(genres) if genres else "[]",
+                    "mal_id": mal_id
                 }
             )
             

@@ -61,6 +61,7 @@ GET_ANIME_BY_ID = """
   query ($id: Int) {
     Media(id: $id, type: ANIME, isAdult: false) {
       id
+      idMal
       title {
         romaji
         english
@@ -141,6 +142,7 @@ async def fetch_anilist_info_by_id(anilist_id: int):
 
             result = {
                 'anilistId': media['id'],
+                'mal_id': media.get('idMal'),
                 'cleanTitle': media['title'].get('english') or media['title'].get('romaji'),
                 'romajiTitle': media['title'].get('romaji'),
                 'nativeTitle': media['title'].get('romaji'),
@@ -271,6 +273,7 @@ async def fetch_anilist_info(title: str):
 
             result = {
                 'anilistId': media['id'],
+                'mal_id': media.get('idMal'),
                 'cleanTitle': media['title']['english'] or media['title']['romaji'],
                 'nativeTitle': media['title'].get('native'),
                 'synonyms': media.get('synonyms', []),
