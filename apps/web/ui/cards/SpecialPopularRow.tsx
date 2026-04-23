@@ -173,4 +173,4 @@ function PairedCard({ item, rank }: { item: any, rank: number }) {
   );
 }
 
-export const SpecialPopularRow = memo(SpecialPopularRowInner);ularRowInner);
+export const SpecialPopularRow = memo(SpecialPopularRowInner);
