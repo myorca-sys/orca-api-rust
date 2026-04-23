@@ -249,12 +249,27 @@ class UniversalExtractor:
         try:
             print(f"[Extractor] Falling back to SmartExtractor for {url}")
             res = await self.client.get(url)
+            
+            if res.status_code in [403, 404, 429, 500, 502, 503]:
+                domain = urllib.parse.urlparse(url).netloc
+                print(f"[Extractor] Domain {domain} failed with {res.status_code}. Blacklisting for 5 minutes.")
+                self.failed_domains[domain] = time.time() + 300  # Blacklist for 5 minutes
+                return url
+                
             html = res.text
             smart_ex = SmartExtractor()
             result = smart_ex.extract_from_html(html)
             if result:
                 print(f"[Extractor] SmartExtractor found stream: {result}")
                 return result
+        except httpx.HTTPStatusError as e:
+            domain = urllib.parse.urlparse(url).netloc
+            print(f"[Extractor] Domain {domain} threw HTTP error {e.response.status_code}. Blacklisting for 5 minutes.")
+            self.failed_domains[domain] = time.time() + 300
+        except httpx.ConnectTimeout:
+            domain = urllib.parse.urlparse(url).netloc
+            print(f"[Extractor] Domain {domain} timed out. Blacklisting for 5 minutes.")
+            self.failed_domains[domain] = time.time() + 300
         except Exception as e:
             print(f"[Extractor] SmartExtractor fallback error on {url}: {e}")
             
