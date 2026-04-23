@@ -59,8 +59,8 @@ async def process_batch(anilist_id: int, url: str):
     try:
         import subprocess
         if file_ext == ".rar":
-            # Coba unar terlebih dahulu, kalau gagal pakai unrar
-            cmd = f"unar -f -o '{extract_dir}/' '{archive_path}' || /usr/local/bin/unrar x -y '{archive_path}' '{extract_dir}/' || unrar x -y '{archive_path}' '{extract_dir}/'"
+            # Coba 7z untuk mengekstrak RAR (menggunakan p7zip-rar/7zip yang kita instal)
+            cmd = f"7z x -y '{archive_path}' -o'{extract_dir}/' || 7za x -y '{archive_path}' -o'{extract_dir}/'"
             process = await asyncio.create_subprocess_shell(
                 cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -68,7 +68,7 @@ async def process_batch(anilist_id: int, url: str):
             )
             stdout, stderr = await process.communicate()
             if process.returncode != 0:
-                await log_status(anilist_id, f"❌ Gagal mengekstrak RAR: {stderr.decode()} | {stdout.decode()}")
+                await log_status(anilist_id, f"❌ Gagal mengekstrak RAR dengan 7z: {stderr.decode()} | {stdout.decode()}")
                 return
         else:
             # zip fallback

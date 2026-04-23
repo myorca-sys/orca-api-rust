@@ -7,13 +7,10 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     wget \
     tar \
-    unar \
+    7zip \
+    p7zip-full \
+    p7zip-rar \
     && rm -rf /var/lib/apt/lists/*
-
-RUN wget https://www.rarlab.com/rar/rarlinux-x64-621.tar.gz && \
-    tar -zxvf rarlinux-x64-621.tar.gz && \
-    cp rar/rar rar/unrar /usr/local/bin && \
-    rm -rf rar rarlinux-x64-621.tar.gz
 
 # Copy requirements
 COPY apps/api/requirements.txt .
