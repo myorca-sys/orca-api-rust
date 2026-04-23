@@ -148,13 +148,17 @@ async def ingest_batch_webhook(request: Request):
     await _verify_qstash(request)
     try:
         print("[Webhook] Executing Batch Ingestion Trigger")
+        from services.queue import QStashPublisher
+        QStashPublisher.spawn_batch_worker()
         return Response(status_code=200, content="Batch Ingestion Scheduled")
     except Exception as e:
         print(f"[Webhook] Error processing batch ingestion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+from fastapi import BackgroundTasks
+
 @router.post("/admin/ingest-batch")
-async def admin_ingest_batch(request: Request):
+async def admin_ingest_batch(request: Request, background_tasks: BackgroundTasks):
     """Trigger auto batch ingestion on Hugging Face Spaces."""
     try:
         payload = await request.json()
@@ -169,17 +173,11 @@ async def admin_ingest_batch(request: Request):
             raise HTTPException(status_code=400, detail="Missing anilist_id or url")
             
         from scripts.batch_gdrive_ingest import process_batch
-        asyncio.create_task(process_batch(int(anilist_id), url))
+        background_tasks.add_task(process_batch, int(anilist_id), url)
         
         return Response(status_code=200, content=json.dumps({"message": f"Batch ingestion started for {anilist_id}"}))
     except Exception as e:
         print(f"[Admin] Error starting batch ingestion: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-        from services.queue import QStashPublisher
-        QStashPublisher.spawn_batch_worker()
-        return Response(status_code=200, content="Batch Ingestion Queued")
-    except Exception as e:
-        print(f"[Webhook] Error processing batch ingestion payload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/webhook/triage")
