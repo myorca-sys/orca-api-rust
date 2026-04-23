@@ -148,6 +148,33 @@ async def ingest_batch_webhook(request: Request):
     await _verify_qstash(request)
     try:
         print("[Webhook] Executing Batch Ingestion Trigger")
+        return Response(status_code=200, content="Batch Ingestion Scheduled")
+    except Exception as e:
+        print(f"[Webhook] Error processing batch ingestion: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/admin/ingest-batch")
+async def admin_ingest_batch(request: Request):
+    """Trigger auto batch ingestion on Hugging Face Spaces."""
+    try:
+        payload = await request.json()
+        anilist_id = payload.get("anilist_id")
+        url = payload.get("url")
+        admin_key = request.headers.get("x-admin-key")
+        
+        if admin_key != os.environ.get("ADMIN_API_KEY"):
+            raise HTTPException(status_code=403, detail="Unauthorized")
+            
+        if not anilist_id or not url:
+            raise HTTPException(status_code=400, detail="Missing anilist_id or url")
+            
+        from scripts.batch_gdrive_ingest import process_batch
+        asyncio.create_task(process_batch(int(anilist_id), url))
+        
+        return Response(status_code=200, content=json.dumps({"message": f"Batch ingestion started for {anilist_id}"}))
+    except Exception as e:
+        print(f"[Admin] Error starting batch ingestion: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         from services.queue import QStashPublisher
         QStashPublisher.spawn_batch_worker()
         return Response(status_code=200, content="Batch Ingestion Queued")
