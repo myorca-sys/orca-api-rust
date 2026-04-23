@@ -176,8 +176,8 @@ class TelegramUploader:
         uploaded_segments: Dict[int, str] = {}
         semaphore = asyncio.Semaphore(max_workers)
 
-        # Select ONE bot for the entire episode to avoid scattered segments
-        selected_bot = random.choice(self.bot_pool) if self.bot_pool else None
+        # Do NOT select a single bot. We pass bot=None to upload_file
+        # so it picks a random bot for EACH segment, enabling true Swarm Load Balancing.
 
         async def _upload_task(index: int, line: str):
             if str(index) in existing_progress:
@@ -189,10 +189,11 @@ class TelegramUploader:
                 return index, None
             
             async with semaphore:
-                file_res = await self.upload_file(segment_path, bot=selected_bot)
+                # Force upload_file to pick a random bot
+                file_res = await self.upload_file(segment_path, bot=None)
                 return index, file_res
 
-        logger.info(f"Starting parallel upload of {len(segment_lines)} segments with {max_workers} workers via {selected_bot['proxy'] if selected_bot else 'None'}...")
+        logger.info(f"Starting parallel upload of {len(segment_lines)} segments with {max_workers} workers (Swarm Load Balancing)...")
         
         tasks = [_upload_task(idx, line) for idx, line in segment_lines]
         results = await asyncio.gather(*tasks, return_exceptions=True)
