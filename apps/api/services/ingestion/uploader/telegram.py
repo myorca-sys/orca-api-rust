@@ -43,10 +43,20 @@ class TelegramUploader:
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID")
         self.bot_pool = _get_bot_pool()
         
+        # Configure global connection pool for Telegram uploads
+        # max_keepalive_connections prevents opening new sockets unnecessarily
+        limits = httpx.Limits(max_keepalive_connections=50, max_connections=100)
+        # Separate timeouts: connect timeout is short so we fail fast and retry/rotate bots
+        timeout = httpx.Timeout(120.0, connect=10.0, pool=30.0)
+        self.client = httpx.AsyncClient(limits=limits, timeout=timeout)
+        
         if not self.bot_pool:
             logger.warning("No valid bot tokens found in env. Uploader will fail.")
         if not self.chat_id:
             logger.warning("TELEGRAM_CHAT_ID not set. Uploader will fail.")
+
+    async def close(self):
+        await self.client.aclose()
 
     async def upload_file(self, file_path: str, max_retries: int = 5, bot: Optional[dict] = None) -> Optional[Dict]:
         """
@@ -77,51 +87,50 @@ class TelegramUploader:
         
         for attempt in range(max_retries):
             try:
-                # Increase timeout to 120.0 so we don't timeout on slow connections while uploading large chunks
-                await _debug(f"Attempt {attempt+1}: connecting to telegram API")
-                async with httpx.AsyncClient(timeout=120.0) as client:
-                    with open(file_path, "rb") as f:
-                        file_key = "video" if endpoint == "sendVideo" else "document"
-                        files = {file_key: (os.path.basename(file_path), f)}
-                        data = {"chat_id": self.chat_id}
-                        
-                        await _debug(f"Attempt {attempt+1}: posting {file_size} bytes")
-                        response = await client.post(url, data=data, files=files)
-                        await _debug(f"Attempt {attempt+1}: got response {response.status_code}")
-                        
-                        if response.status_code == 200:
-                            resp_json = response.json()
-                            file_id = None
-                            message_id = resp_json.get("result", {}).get("message_id")
-                            if "document" in resp_json.get("result", {}):
-                                file_id = resp_json["result"]["document"]["file_id"]
-                            elif "video" in resp_json.get("result", {}):
-                                file_id = resp_json["result"]["video"]["file_id"]
-                                
-                            if file_id:
-                                final_url = f"{proxy_url}/{file_id}" if proxy_url else file_id
-                                # Success! Give Telegram API a tiny breather before the next worker slams it
-                                await asyncio.sleep(1)
-                                return {
-                                    "url": final_url,
-                                    "message_id": message_id,
-                                    "bot_token": bot_token
-                                }
-                                
-                        elif response.status_code == 429:
-                            # Too Many Requests - Increased delay
-                            retry_after = response.json().get("parameters", {}).get("retry_after", 30)
-                            wait = retry_after + random.uniform(5, 15)
-                            await _debug(f"Rate limited (429) for {os.path.basename(file_path)}, waiting {wait:.1f}s")
-                            await asyncio.sleep(wait)
+                await _debug(f"Attempt {attempt+1}: using shared connection pool to telegram API")
+                with open(file_path, "rb") as f:
+                    file_key = "video" if endpoint == "sendVideo" else "document"
+                    files = {file_key: (os.path.basename(file_path), f)}
+                    data = {"chat_id": self.chat_id}
+                    
+                    await _debug(f"Attempt {attempt+1}: posting {file_size} bytes")
+                    # Use the shared self.client instead of opening a new one
+                    response = await self.client.post(url, data=data, files=files)
+                    await _debug(f"Attempt {attempt+1}: got response {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        resp_json = response.json()
+                        file_id = None
+                        message_id = resp_json.get("result", {}).get("message_id")
+                        if "document" in resp_json.get("result", {}):
+                            file_id = resp_json["result"]["document"]["file_id"]
+                        elif "video" in resp_json.get("result", {}):
+                            file_id = resp_json["result"]["video"]["file_id"]
                             
-                            # Switch to a different bot on rate limit
-                            bot = random.choice(self.bot_pool)
-                            bot_token = bot["token"]
-                            url = f"https://api.telegram.org/bot{bot_token}/{endpoint}"
-                            continue
-                        else:
-                            await _debug(f"Failed to upload {os.path.basename(file_path)}. HTTP {response.status_code}: {response.text}")
+                        if file_id:
+                            final_url = f"{proxy_url}/{file_id}" if proxy_url else file_id
+                            # Success! Give Telegram API a tiny breather before the next worker slams it
+                            await asyncio.sleep(1)
+                            return {
+                                "url": final_url,
+                                "message_id": message_id,
+                                "bot_token": bot_token
+                            }
+                            
+                    elif response.status_code == 429:
+                        # Too Many Requests - Increased delay
+                        retry_after = response.json().get("parameters", {}).get("retry_after", 30)
+                        wait = retry_after + random.uniform(5, 15)
+                        await _debug(f"Rate limited (429) for {os.path.basename(file_path)}, waiting {wait:.1f}s")
+                        await asyncio.sleep(wait)
+                        
+                        # Switch to a different bot on rate limit
+                        bot = random.choice(self.bot_pool)
+                        bot_token = bot["token"]
+                        url = f"https://api.telegram.org/bot{bot_token}/{endpoint}"
+                        continue
+                    else:
+                        await _debug(f"Failed to upload {os.path.basename(file_path)}. HTTP {response.status_code}: {response.text}")
             except Exception as e:
                 await _debug(f"Exception during Telegram upload (attempt {attempt+1}): {repr(e)}")
             

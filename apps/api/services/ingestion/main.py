@@ -110,8 +110,10 @@ class IngestionEngine:
 
             try:
                 success, local_video_path, m3u8_path, final_stream_url = await asyncio.wait_for(_run_pipeline(), timeout=3600.0)
-            except asyncio.TimeoutError:
-                print(f"[Ingestion] Timeout (1 hour) exceeded for Anime: {anilist_id} | Ep: {episode_number}")
+            except asyncio.TimeoutError as e:
+                import traceback
+                print(f"[Ingestion] TimeoutError caught for Anime: {anilist_id} | Ep: {episode_number}")
+                traceback.print_exc()
                 success = False
                 error_type = "timeout"
 

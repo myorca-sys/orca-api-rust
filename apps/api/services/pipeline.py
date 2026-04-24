@@ -446,9 +446,21 @@ async def resolve_episode_sources(episode_url: str, provider_id: str) -> dict:
         resolved_list = await asyncio.gather(*tasks)
         final_sources = [s for s in resolved_list if s is not None]
 
-        # 4. Sort by quality
-        quality_rank = {"1080p": 5, "720p": 4, "480p": 3, "360p": 2, "Auto": 1}
-        final_sources.sort(key=lambda x: quality_rank.get(x["quality"], 0), reverse=True)
+        # 4. Filter and Sort by quality (720p priority, 1080p fallback, reject others)
+        allowed_qualities = ["720p", "1080p"]
+        # Jika Auto/Unknown quality, kita bisa biarkan saja masuk karena bisa jadi HLS master playlist
+        filtered_sources = [s for s in final_sources if any(q in s.get("quality", "Auto") for q in allowed_qualities) or "Auto" in s.get("quality", "Auto")]
+        
+        # Jika setelah di-filter kosong, fallback ke list aslinya dengan filter longgar
+        if not filtered_sources:
+            filtered_sources = final_sources
+            
+        # Peringkat: 720p adalah 5 (Tertinggi), 1080p adalah 4 (Tertinggi ke-2), Auto adalah 3, lainnya di bawah itu
+        quality_rank = {"720p": 5, "1080p": 4, "Auto": 3, "480p": 2, "360p": 1}
+        
+        # Sort descending (Tertinggi di index 0)
+        filtered_sources.sort(key=lambda x: quality_rank.get(x.get("quality", "Auto"), 0), reverse=True)
+        final_sources = filtered_sources
 
         from utils.signed_url import sign_stream_url
         for source in final_sources:

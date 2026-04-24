@@ -116,6 +116,7 @@ class UniversalExtractor:
         )
         self.semaphore = asyncio.Semaphore(concurrency_limit)
         self._tls = TLSSpoofTransport
+        self.failed_domains = {}
 
     async def extract_raw_video(self, embed_url: str) -> str:
         async with self.semaphore:

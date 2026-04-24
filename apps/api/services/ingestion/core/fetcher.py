@@ -113,14 +113,16 @@ async def _parallel_download(url: str, output_path: str, file_size: int) -> bool
 
     logger.info(f"[Fetcher] {len(chunks)} chunks x {CHUNK_SIZE_MB}MB | {CHUNK_WORKERS} workers paralel")
 
+    part_file = f"{output_path}.part"
+
     # Pre-allocate file dengan ukuran penuh agar bisa tulis di posisi manapun
-    with open(output_path, "wb") as f:
+    with open(part_file, "wb") as f:
         f.seek(file_size - 1)
         f.write(b"\x00")
 
     semaphore = asyncio.Semaphore(CHUNK_WORKERS)
     tasks = [
-        _download_chunk(url, headers, start, end, i, output_path, semaphore)
+        _download_chunk(url, headers, start, end, i, part_file, semaphore)
         for start, end, i in chunks
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -128,7 +130,14 @@ async def _parallel_download(url: str, output_path: str, file_size: int) -> bool
     failed = sum(1 for r in results if r is not True)
     if failed > 0:
         logger.error(f"[Fetcher] {failed}/{len(chunks)} chunks gagal")
+        if os.path.exists(part_file):
+            os.remove(part_file)
         return False
+
+    # Rename .part to final output_path if successful
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    os.rename(part_file, output_path)
 
     logger.info(f"[Fetcher] Semua {len(chunks)} chunks berhasil diunduh")
     return True
