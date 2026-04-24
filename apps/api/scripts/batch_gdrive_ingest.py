@@ -18,7 +18,17 @@ async def log_status(anilist_id, message):
     print(message)
     await upstash_set(f"batch_status:{anilist_id}", message)
 
+import traceback
+
 async def process_batch(anilist_id: int, url: str):
+    try:
+        await _process_batch_impl(anilist_id, url)
+    except Exception as e:
+        err_msg = f"❌ Error Fatal Batch: {e}\n{traceback.format_exc()}"
+        print(err_msg)
+        await log_status(anilist_id, err_msg)
+
+async def _process_batch_impl(anilist_id: int, url: str):
     await log_status(anilist_id, f"🚀 Memulai Auto Batch Ingestion untuk Anilist ID: {anilist_id}")
     
     # 1. Resolve URL if it's Desustream
