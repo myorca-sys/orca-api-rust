@@ -57,7 +57,7 @@ async def ingest_pending(limit: int):
             # Prioritize 720p
             for s in sources_response["sources"]:
                 if s.get("quality") == "720p" and s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
-                    direct_url = s.get("url", "")
+                    direct_url = s.get("raw_url") or s.get("url", "")
                     provider_id = s.get("source", "unknown")
                     break
             
@@ -65,7 +65,7 @@ async def ingest_pending(limit: int):
             if not direct_url:
                 for s in sources_response["sources"]:
                     if s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
-                        direct_url = s.get("url", "")
+                        direct_url = s.get("raw_url") or s.get("url", "")
                         provider_id = s.get("source", "unknown")
                         break
             
