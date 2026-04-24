@@ -59,8 +59,8 @@ async def process_batch(anilist_id: int, url: str):
     try:
         import subprocess
         if file_ext == ".rar":
-            # Extract RAR using official unrar binary
-            cmd = f"/usr/local/bin/unrar x -y '{archive_path}' '{extract_dir}/'"
+            # Extract RAR using unar directly
+            cmd = f"unar -f -o '{extract_dir}/' '{archive_path}'"
             process = await asyncio.create_subprocess_shell(
                 cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -68,7 +68,7 @@ async def process_batch(anilist_id: int, url: str):
             )
             stdout, stderr = await process.communicate()
             if process.returncode != 0:
-                await log_status(anilist_id, f"❌ Gagal mengekstrak RAR dengan unrar: {stderr.decode()} | {stdout.decode()}")
+                await log_status(anilist_id, f"❌ Gagal mengekstrak RAR dengan unar: {stderr.decode()} | {stdout.decode()}")
                 return
         else:
             # zip fallback

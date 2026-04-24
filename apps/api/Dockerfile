@@ -5,15 +5,8 @@ WORKDIR /app
 # Install system dependencies including ffmpeg for video slicing
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    wget \
-    p7zip-full \
+    unar \
     && rm -rf /var/lib/apt/lists/*
-
-RUN wget https://www.rarlab.com/rar/rarlinux-x64-621.tar.gz && \
-    tar -zxvf rarlinux-x64-621.tar.gz && \
-    cp rar/unrar /usr/local/bin/unrar && \
-    chmod +x /usr/local/bin/unrar && \
-    rm -rf rar rarlinux-x64-621.tar.gz
 
 # Copy requirements
 COPY apps/api/requirements.txt .
