@@ -400,7 +400,7 @@ async def browse_anime(
     query = f"""
         SELECT meta.*, COUNT(e."episodeNumber") as episode_count
         FROM anime_metadata meta
-        LEFT JOIN episodes e ON meta."anilistId" = e."anilistId"
+        INNER JOIN episodes e ON meta."anilistId" = e."anilistId"
         WHERE {where_clause}
         GROUP BY meta."anilistId"
         ORDER BY {order_clause}
