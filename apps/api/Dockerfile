@@ -1,11 +1,12 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-
 # Install system dependencies including ffmpeg for video slicing
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     wget \
+    unar \
+    p7zip-full \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://www.rarlab.com/rar/rarlinux-x64-621.tar.gz && \
