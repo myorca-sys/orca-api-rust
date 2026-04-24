@@ -387,7 +387,7 @@ async def get_sources_v2(
             all_sources.extend(res['sources'])
 
     # FILTER: ONLY DIRECT LINKS
-    all_sources = [s for s in all_sources if s.get('type') == 'direct']
+    all_sources = [s for s in all_sources if s.get('type') in ['direct', 'mp4 (direct)', 'hls (direct)']]
 
     all_sources.sort(key=lambda x: QUALITY_RANK.get(x.get('quality', 'Auto'), 1), reverse=True)
 
