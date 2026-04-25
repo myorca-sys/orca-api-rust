@@ -172,10 +172,12 @@ class IngestionEngine:
             try:
                 from services.cache import upstash_del
                 lock_key = f"ingest:{anilist_id}:{episode_number}"
+                progress_key = f"ingest_progress:{anilist_id}:{episode_number}"
                 await upstash_del(lock_key)
-                logger.info(f"Released lock for {lock_key}")
+                await upstash_del(progress_key) # Bersihkan juga progress key agar tidak nyangkut (ghost key)
+                logger.info(f"Released lock and cleared progress for {anilist_id} Ep {episode_number}")
             except Exception as e:
-                logger.warning(f"Failed to release Redis lock: {e}")
+                logger.warning(f"Failed to release Redis keys: {e}")
 
     def _cleanup_temp_files(self, mp4_path: str, m3u8_path: str):
         """Removes local temporary files to save disk space."""
