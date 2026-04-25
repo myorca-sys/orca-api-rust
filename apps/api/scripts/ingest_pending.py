@@ -14,19 +14,30 @@ from db.connection import database as db
 from services.ingestion.main import IngestionEngine
 from services.stream_cache import get_cached_stream
 
+async def _log_to_redis(msg: str):
+    print(msg)
+    try:
+        from services.cache import client as redis_client
+        from services.config import UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+        import json
+        # Append to a list
+        headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}", "Content-Type": "application/json"}
+        # LPUSH to list
+        await redis_client.post(f"{UPSTASH_REDIS_REST_URL}/lpush/hf_ingest_logs", headers=headers, json=[msg])
+        # LTRIM to keep only last 50
+        await redis_client.get(f"{UPSTASH_REDIS_REST_URL}/ltrim/hf_ingest_logs/0/49", headers=headers)
+    except Exception:
+        pass
+
 async def ingest_pending(limit: int = 5000):
-    # Mengabaikan limit dari parameter lama agar kita bisa memproses lebih banyak secara batch
     limit = 5000 
-    
-    print(f"🚀 Memulai HF Space Worker Ingestion: Mencari maksimal {limit} episode tertunda...")
+    await _log_to_redis(f"🚀 Memulai HF Space Worker Ingestion: Mencari maksimal {limit} episode tertunda...")
     
     should_disconnect = False
     if not db.is_connected:
         await db.connect()
         should_disconnect = True
         
-    # Cari episode yang URL-nya belum tg-proxy
-    # Diurutkan berdasarkan anilistId (Anime yang sama) lalu episodeNumber secara berurutan
     query = """
         SELECT id, "anilistId", "episodeNumber", "episodeUrl" 
         FROM episodes 
@@ -39,14 +50,13 @@ async def ingest_pending(limit: int = 5000):
     rows = await db.fetch_all(query, values={"limit": limit})
     
     if not rows:
-        print("✅ Tidak ada episode yang perlu di-ingest. Semua up-to-date!")
+        await _log_to_redis("✅ Tidak ada episode yang perlu di-ingest. Semua up-to-date!")
         if should_disconnect:
             await db.disconnect()
         return
 
-    print(f"Ditemukan {len(rows)} episode antrean. Memproses SATU PER SATU secara berurutan (Hard Stitch)...")
-    print("-" * 50)
-
+    await _log_to_redis(f"Ditemukan {len(rows)} episode antrean. Memproses SATU PER SATU secara berurutan (Hard Stitch)...")
+    
     engine = IngestionEngine()
     
     for row in rows:
@@ -57,61 +67,59 @@ async def ingest_pending(limit: int = 5000):
         anime_row = await db.fetch_one('SELECT "cleanTitle" FROM anime_metadata WHERE "anilistId" = :aid', {"aid": aid})
         title = anime_row["cleanTitle"] if anime_row else f"Anime {aid}"
         
-        print(f"\n📺 [{time.strftime('%H:%M:%S')}] Memproses Ingest: {title} - Episode {ep_num}")
+        await _log_to_redis(f"\n📺 [{time.strftime('%H:%M:%S')}] Memproses Ingest: {title} - Episode {ep_num}")
         
-        sources_response = await get_cached_stream(aid, ep_num)
-        if sources_response and "sources" in sources_response and len(sources_response["sources"]) > 0:
-            direct_url = ""
-            provider_id = "unknown"
-            
-            # Prioritize 720p
-            for s in sources_response["sources"]:
-                if s.get("quality") == "720p" and s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
-                    direct_url = s.get("raw_url") or s.get("url", "")
-                    provider_id = s.get("source", "unknown")
-                    break
-
-            # Fallback to first available direct stream if 720p not found
-            if not direct_url:
+        try:
+            sources_response = await get_cached_stream(aid, ep_num)
+            if sources_response and "sources" in sources_response and len(sources_response["sources"]) > 0:
+                direct_url = ""
+                provider_id = "unknown"
+                
                 for s in sources_response["sources"]:
-                    if s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
+                    if s.get("quality") == "720p" and s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
                         direct_url = s.get("raw_url") or s.get("url", "")
                         provider_id = s.get("source", "unknown")
                         break
 
-            if not direct_url:
-                print(f"⚠️ Melewati Ep {ep_num} karena tidak memiliki Direct Stream murni (hanya ada Iframe).")
-                continue
+                if not direct_url:
+                    for s in sources_response["sources"]:
+                        if s.get("type") in ["mp4", "direct", "hls", "mp4 (direct)", "hls (direct)"]:
+                            direct_url = s.get("raw_url") or s.get("url", "")
+                            provider_id = s.get("source", "unknown")
+                            break
 
-            if "tg-proxy" in direct_url or "workers.dev" in direct_url:
-                print(f"✅ Sudah ter-ingest (Proxy URL Ditemukan).")
-                continue
+                if not direct_url:
+                    await _log_to_redis(f"⚠️ Melewati Ep {ep_num} karena tidak memiliki Direct Stream murni (hanya ada Iframe).")
+                    continue
 
-            print(f"🔗 Direct URL: {direct_url[:50]}... [{provider_id}]")
-            print(f"⏳ Mengeksekusi Ingestion Engine (Download -> Slice -> Upload Telegram)...")
-            
-            # Hard Stitch (Tunggu sampai selesai 100% baru lanjut ke episode berikutnya)
-            success = await engine.process_episode(
-                episode_id=ep_id,
-                anilist_id=aid,
-                provider_id=provider_id,
-                episode_number=ep_num,
-                direct_video_url=direct_url
-            )
-            
-            if success:
-                print(f"🎉 SUKSES: Episode {ep_num} berhasil disimpan permanen ke Telegram!")
+                if "tg-proxy" in direct_url or "workers.dev" in direct_url:
+                    await _log_to_redis(f"✅ Sudah ter-ingest (Proxy URL Ditemukan).")
+                    continue
+
+                await _log_to_redis(f"🔗 Direct URL: {direct_url[:50]}... [{provider_id}]")
+                await _log_to_redis(f"⏳ Mengeksekusi Ingestion Engine (Download -> Slice -> Upload Telegram)...")
+                
+                success = await engine.process_episode(
+                    episode_id=ep_id,
+                    anilist_id=aid,
+                    provider_id=provider_id,
+                    episode_number=ep_num,
+                    direct_video_url=direct_url
+                )
+                
+                if success:
+                    await _log_to_redis(f"🎉 SUKSES: Episode {ep_num} berhasil disimpan permanen ke Telegram!")
+                else:
+                    await _log_to_redis(f"❌ GAGAL: Terjadi kesalahan saat memproses episode {ep_num}.")
             else:
-                print(f"❌ GAGAL: Terjadi kesalahan saat memproses episode {ep_num}.")
-        else:
-            print(f"❌ Sumber mentah tidak ditemukan untuk {aid} Ep {ep_num}")
+                await _log_to_redis(f"❌ Sumber mentah tidak ditemukan untuk {aid} Ep {ep_num}")
 
-        # Jeda pendinginan agar server/Telegram API tidak overload
-        print("⏳ Jeda pendinginan 10 detik sebelum episode selanjutnya...")
-        await asyncio.sleep(10)
+            await _log_to_redis("⏳ Jeda pendinginan 10 detik sebelum episode selanjutnya...")
+            await asyncio.sleep(10)
+        except Exception as e:
+            await _log_to_redis(f"❌ Fatal Error memproses {aid} Ep {ep_num}: {str(e)}")
 
-    print("-" * 50)
-    print("🎉 Seluruh proses antrean batch selesai!")
+    await _log_to_redis("🎉 Seluruh proses antrean batch selesai!")
 
     if should_disconnect:
         await db.disconnect()
