@@ -14,6 +14,20 @@ from db.connection import database as db
 from services.ingestion.main import IngestionEngine
 from services.stream_cache import get_cached_stream
 
+async def _send_telegram_alert(msg: str):
+    import httpx
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if bot_token and chat_id:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}
+                )
+        except Exception:
+            pass
+
 async def _log_to_redis(msg: str):
     print(msg)
     try:
@@ -31,7 +45,9 @@ async def _log_to_redis(msg: str):
 
 async def ingest_pending(limit: int = 5000):
     limit = 5000 
-    await _log_to_redis(f"🚀 Memulai HF Space Worker Ingestion: Mencari maksimal {limit} episode tertunda...")
+    start_msg = f"🚀 Memulai HF Space Worker Ingestion: Mencari maksimal {limit} episode tertunda..."
+    await _log_to_redis(start_msg)
+    await _send_telegram_alert(f"🚀 <b>BATCH INGESTION STARTED</b>\nLimit: {limit} episodes")
     
     should_disconnect = False
     if not db.is_connected:
@@ -109,17 +125,22 @@ async def ingest_pending(limit: int = 5000):
                 
                 if success:
                     await _log_to_redis(f"🎉 SUKSES: Episode {ep_num} berhasil disimpan permanen ke Telegram!")
+                    await _send_telegram_alert(f"✅ <b>INGEST SUCCESS</b>\n📺 {title} - Ep {ep_num}\nProvider: <code>{provider_id}</code>")
                 else:
                     await _log_to_redis(f"❌ GAGAL: Terjadi kesalahan saat memproses episode {ep_num}.")
+                    await _send_telegram_alert(f"❌ <b>INGEST FAILED</b>\n📺 {title} - Ep {ep_num}")
             else:
                 await _log_to_redis(f"❌ Sumber mentah tidak ditemukan untuk {aid} Ep {ep_num}")
+                await _send_telegram_alert(f"⚠️ <b>NO SOURCE</b>\n📺 {title} - Ep {ep_num}")
 
             await _log_to_redis("⏳ Jeda pendinginan 10 detik sebelum episode selanjutnya...")
             await asyncio.sleep(10)
         except Exception as e:
             await _log_to_redis(f"❌ Fatal Error memproses {aid} Ep {ep_num}: {str(e)}")
+            await _send_telegram_alert(f"💀 <b>FATAL ERROR</b>\n📺 {title} - Ep {ep_num}\nError: <code>{str(e)}</code>")
 
     await _log_to_redis("🎉 Seluruh proses antrean batch selesai!")
+    await _send_telegram_alert(f"🏁 <b>BATCH COMPLETE</b>")
 
     if should_disconnect:
         await db.disconnect()
