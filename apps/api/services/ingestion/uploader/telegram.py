@@ -52,7 +52,7 @@ class TelegramUploader:
     def _get_client(self):
         if self.client is None:
             limits = httpx.Limits(max_keepalive_connections=50, max_connections=100)
-            timeout = httpx.Timeout(120.0, connect=15.0, pool=30.0)
+            timeout = httpx.Timeout(240.0, connect=60.0, pool=60.0)
             self.client = httpx.AsyncClient(limits=limits, timeout=timeout)
         return self.client
 
@@ -72,7 +72,7 @@ class TelegramUploader:
                 from services.config import UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
                 import urllib.parse
                 # Safely truncate message to avoid URL too long
-                safe_msg = urllib.parse.quote(str(msg)[:200])
+                safe_msg = urllib.parse.quote(str(msg)[:200].replace('\n', ' '))
                 await redis_client.get(f"{UPSTASH_REDIS_REST_URL}/lpush/debug_tg_log/{safe_msg}", headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"})
             except:
                 pass
@@ -131,9 +131,7 @@ class TelegramUploader:
                     else:
                         await _debug(f"Failed to upload {os.path.basename(file_path)}. HTTP {response.status_code}")
             except Exception as e:
-                import traceback
-                tb_str = traceback.format_exc()
-                await _debug(f"Exception during Telegram upload (attempt {attempt+1}): {repr(e)} - {tb_str}")
+                await _debug(f"Exception during Telegram upload (attempt {attempt+1}): {repr(e)}")
             
             wait = (2 ** attempt) * 5 + random.uniform(2, 5)
             await asyncio.sleep(wait)
