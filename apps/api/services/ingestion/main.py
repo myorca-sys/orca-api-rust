@@ -63,10 +63,10 @@ class IngestionEngine:
                 await database.connect()
                 should_disconnect = True
                 
-            # --- SKIP CHECK: Prevent double ingestion ---
-            check_query = 'SELECT "episodeUrl" FROM episodes WHERE id = :id'
-            row = await database.fetch_one(check_query, values={"id": episode_id})
-            if row and ("tg-proxy" in row["episodeUrl"] or "workers.dev" in row["episodeUrl"]):
+            # --- SKIP CHECK: Prevent double ingestion across all providers ---
+            check_query = 'SELECT "episodeUrl" FROM episodes WHERE "anilistId" = :aid AND "episodeNumber" = :ep AND ("episodeUrl" LIKE \'%tg-proxy%\' OR "episodeUrl" LIKE \'%workers.dev%\') LIMIT 1'
+            row = await database.fetch_one(check_query, values={"aid": anilist_id, "ep": episode_number})
+            if row:
                 print(f"[Ingestion] Skipping ingestion for Anime: {anilist_id} | Ep: {episode_number} - Already ingested: {row['episodeUrl']}")
                 return True
                 
