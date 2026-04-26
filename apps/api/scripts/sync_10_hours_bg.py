@@ -131,40 +131,50 @@ async def _run_sync_logic():
         await send_tele_alert(search_msg)
         
         found = False
+        possible_titles = []
+        if anilist_data.get("romajiTitle"): possible_titles.append(anilist_data["romajiTitle"])
+        if anilist_data.get("cleanTitle") and anilist_data["cleanTitle"] not in possible_titles: possible_titles.append(anilist_data["cleanTitle"])
+        for syn in anilist_data.get("synonyms", [])[:2]:
+            if syn and syn not in possible_titles: possible_titles.append(syn)
+        
+        if not possible_titles:
+            possible_titles.append(title)
+            
         for name, provider in search_providers.items():
             if found: break
-            try:
-                search_title = anilist_data.get("romajiTitle") or title
-                results = await provider.search(search_title)
-                if results and len(results) > 0:
-                    for best_match in results[:3]:
-                        provider_slug = best_match.get("slug") or best_match.get("url").strip("/").split("/")[-1]
-                        
-                        if provider_slug:
-                            recon_res = await reconciler.reconcile(name, provider_slug, best_match.get('title', search_title))
+            
+            for search_title in possible_titles:
+                if found: break
+                try:
+                    results = await provider.search(search_title)
+                    if results and len(results) > 0:
+                        for best_match in results[:3]:
+                            provider_slug = best_match.get("slug") or best_match.get("url").strip("/").split("/")[-1]
                             
-                            if recon_res and recon_res.canonical_anilist_id == anilist_id:
-                                mapping_msg = f"🔗 <b>[MAPPED]</b> Ketemu di {name}!\nTitle: <i>{best_match.get('title')}</i>"
-                                print(f"  [+] {mapping_msg.replace('<b>', '').replace('</b>', '').replace('<i>', '').replace('</i>', '')}")
-                                await send_tele_alert(mapping_msg)
+                            if provider_slug:
+                                recon_res = await reconciler.reconcile(name, provider_slug, best_match.get('title', search_title))
                                 
-                                anilist_data_copy = anilist_data.copy()
-                                anilist_data_copy["anilistId"] = recon_res.canonical_anilist_id
-                                anilist_data_copy["cleanTitle"] = recon_res.canonical_title
-                                await upsert_anime_db(anilist_data_copy, name, provider_slug)
-                                
-                                found = True
-                                break
-            except Exception as e:
-                err_str = str(e)
-                if "429" in err_str or "Quota" in err_str:
-                    print(f"  [!] Rate Limit Gemini di {name}.")
-                elif "403" in err_str or "Forbidden" in err_str:
-                    print(f"  [!] Blocked (403) oleh {name} Anti-Bot.")
-                    await send_tele_alert(f"🛑 <b>[BLOCKED 403]</b> Akses ke {name} ditolak oleh Cloudflare/Anti-Bot!")
-                else:
-                    print(f"  [!] Error search {name}: {err_str}")
-                pass 
+                                if recon_res and recon_res.canonical_anilist_id == anilist_id:
+                                    mapping_msg = f"🔗 <b>[MAPPED]</b> Ketemu di {name}!\nTitle: <i>{best_match.get('title')}</i>"
+                                    print(f"  [+] {mapping_msg.replace('<b>', '').replace('</b>', '').replace('<i>', '').replace('</i>', '')}")
+                                    await send_tele_alert(mapping_msg)
+                                    
+                                    anilist_data_copy = anilist_data.copy()
+                                    anilist_data_copy["anilistId"] = recon_res.canonical_anilist_id
+                                    anilist_data_copy["cleanTitle"] = recon_res.canonical_title
+                                    await upsert_anime_db(anilist_data_copy, name, provider_slug)
+                                    
+                                    found = True
+                                    break
+                except Exception as e:
+                    err_str = str(e)
+                    if "429" in err_str or "Quota" in err_str:
+                        print(f"  [!] Rate Limit Gemini di {name}.")
+                    elif "403" in err_str or "Forbidden" in err_str:
+                        print(f"  [!] Blocked (403) oleh {name} Anti-Bot.")
+                        await send_tele_alert(f"🛑 <b>[BLOCKED 403]</b> Akses ke {name} ditolak oleh Cloudflare/Anti-Bot!")
+                    else:
+                        print(f"  [!] Error search {name} with {search_title}: {err_str}")
                 
         if found:
             print(f"🔄 Memulai sync episodes untuk {title}...")
