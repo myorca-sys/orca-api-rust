@@ -44,7 +44,9 @@ async def send_tele_alert(message: str):
         print(f"[TeleAlert] Gagal kirim pesan: {e}")
 
 async def run_10_hours_sync():
+    await set_state("run_10_hours_sync started")
     await log_to_redis("🚀 [10H-Sync] Task dipanggil!")
+    await set_state("lock acquired")
     lock = DistributedLock(
         upstash_get_fn=upstash_get,
         upstash_set_fn=upstash_set,
@@ -53,17 +55,25 @@ async def run_10_hours_sync():
     )
     try:
         async with lock:
+            await set_state("lock block entered")
             await _run_sync_logic()
     except TimeoutError:
+        await set_state("timeout error")
         print("[10H-Sync] Proses lain sedang berjalan. Membatalkan eksekusi ini.")
     except Exception as e:
+        await set_state(f"exception: {str(e)}")
         import traceback
         err = traceback.format_exc()
         print(f"[10H-Sync] Error fatal: {e}\n{err}")
         await send_tele_alert(f"❌ <b>[10H-SYNC] ERROR FATAL:</b>\n<pre>{e}</pre>")
 
+async def set_state(state: str):
+    await upstash_set("10h_sync_status", {"state": state, "time": time.time()}, ex=3600)
+
 async def _run_sync_logic():
+    await set_state("Entering _run_sync_logic")
     print("🚀 [10H-Sync] Mengambil 2400 Anime (Prioritas ONGOING, lalu Terpopuler)...")
+    await set_state("Sending tele alert 1")
     await send_tele_alert("🚀 <b>[10H-SYNC] STARTED:</b> Mencari maksimal 2400 anime tanpa episode dari Database...")
     
     query = """
@@ -79,7 +89,9 @@ async def _run_sync_logic():
         LIMIT 2400
     """
     
+    await set_state("Executing DB query")
     rows = await database.fetch_all(query)
+    await set_state(f"DB query complete, rows: {len(rows)}")
     
     if not rows:
         msg = "✅ [10H-Sync] Tidak ada anime tanpa episode tersisa di Database."
