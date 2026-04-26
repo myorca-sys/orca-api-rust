@@ -166,6 +166,29 @@ export default function ProfileView() {
               </div>
               <ChevronRight className="w-5 h-5 text-white/20" />
             </Link>
+
+            <button 
+              onClick={() => {
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  navigator.serviceWorker.ready.then(reg => {
+                    reg.update().then(() => {
+                      alert('Memeriksa pembaruan...');
+                    });
+                  });
+                } else {
+                  alert('PWA tidak didukung di peramban ini.');
+                }
+              }}
+              className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A84FF]/20">
+                  <RefreshCw className="w-4 h-4 text-[#0A84FF]" />
+                </div>
+                <span className="font-bold text-[14px] text-white">Cek Pembaruan (PWA)</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/20" />
+            </button>
           </div>
         </section>
 
