@@ -384,7 +384,8 @@ async def test_upload():
         part2 = "AAEzRhYIrbfRsfsI62aaQcWr-39xO7t1VX0"
         bot_token = f"{part1}:{part2}"
         chat_id = "1558640518"
-        url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+        tg_proxy = "https://tele-proxy.moehamadhkl.workers.dev"
+        url = f"{tg_proxy}/bot{bot_token}/sendDocument"
         
         with open(file_path, "rb") as f:
             files = {"document": ("test_tiny.txt", f)}
