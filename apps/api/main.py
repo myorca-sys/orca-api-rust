@@ -359,6 +359,17 @@ async def debug_db():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/api/v2/admin/ping-tele")
+async def ping_tele():
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get("https://api.telegram.org")
+            return {"status": res.status_code, "text": res.text}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "repr": repr(e), "trace": traceback.format_exc()}
+
 @app.head("/healthz", tags=["System"])
 @app.get("/healthz", tags=["System"])
 async def health():
