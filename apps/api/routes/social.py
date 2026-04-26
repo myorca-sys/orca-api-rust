@@ -196,3 +196,57 @@ async def get_activity_feed(user_id: str):
     query = select(activity_feed).where(activity_feed.c.user_id == user_id).order_by(desc(activity_feed.c.created_at))
     rows = await database.fetch_all(query)
     return {"success": True, "feed": [dict(row) for row in rows]}
+
+@router.get("/notifications")
+async def get_global_notifications():
+    # Fetch 20 most recently updated episodes that have tg-proxy
+    from db.models import episodes
+    query = select(
+        episodes.c.anilistId,
+        episodes.c.episodeNumber,
+        episodes.c.updatedAt,
+        anime_metadata.c.cleanTitle,
+        anime_metadata.c.nativeTitle,
+        anime_metadata.c.coverImage
+    ).select_from(
+        episodes.outerjoin(anime_metadata, episodes.c.anilistId == anime_metadata.c.anilistId)
+    ).where(
+        episodes.c.episodeUrl.like('%tg-proxy%') | episodes.c.episodeUrl.like('%workers.dev%')
+    ).order_by(
+        desc(episodes.c.updatedAt)
+    ).limit(20)
+    
+    rows = await database.fetch_all(query)
+    
+    notifications = []
+    import datetime
+    
+    def time_ago(dt):
+        if not dt: return "Baru saja"
+        now = datetime.datetime.utcnow()
+        if dt.tzinfo:
+            now = now.replace(tzinfo=datetime.timezone.utc)
+        diff = now - dt
+        if diff.days > 0:
+            return f"{diff.days} hari yang lalu"
+        elif diff.seconds >= 3600:
+            return f"{diff.seconds // 3600} jam yang lalu"
+        elif diff.seconds >= 60:
+            return f"{diff.seconds // 60} menit yang lalu"
+        return "Baru saja"
+        
+    for i, r in enumerate(rows):
+        title = r["cleanTitle"] or r["nativeTitle"] or f"Anime {r['anilistId']}"
+        ep_num = r["episodeNumber"]
+        notifications.append({
+            "id": i + 1,
+            "title": f"Episode Baru: {title}",
+            "message": f"Episode {ep_num} sekarang tersedia dalam kualitas 1080p/720p! Tonton sekarang tanpa buffering.",
+            "time": time_ago(r["updatedAt"]),
+            "isUnread": True,
+            "type": "new_episode",
+            "link": f"/watch/{r['anilistId']}/{ep_num}"
+        })
+        
+    return {"success": True, "data": notifications}
+
