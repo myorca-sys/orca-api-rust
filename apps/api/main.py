@@ -370,6 +370,32 @@ async def ping_tele():
         import traceback
         return {"error": str(e), "repr": repr(e), "trace": traceback.format_exc()}
 
+@app.get("/api/v2/admin/test-upload")
+async def test_upload():
+    import httpx
+    import os
+    try:
+        # Create a tiny 10KB file
+        file_path = "/tmp/test_tiny.txt"
+        with open(file_path, "wb") as f:
+            f.write(os.urandom(10240))
+            
+        part1 = "8640932204"
+        part2 = "AAEzRhYIrbfRsfsI62aaQcWr-39xO7t1VX0"
+        bot_token = f"{part1}:{part2}"
+        chat_id = "1558640518"
+        url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+        
+        with open(file_path, "rb") as f:
+            files = {"document": ("test_tiny.txt", f)}
+            data = {"chat_id": chat_id}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(url, data=data, files=files)
+                return {"status": res.status_code, "text": res.text}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "repr": repr(e), "trace": traceback.format_exc()}
+
 @app.head("/healthz", tags=["System"])
 @app.get("/healthz", tags=["System"])
 async def health():
