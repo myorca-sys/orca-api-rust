@@ -64,7 +64,7 @@ async def ingest_pending(limit: int = 5000):
         WHERE "episodeUrl" NOT LIKE '%tg-proxy%' 
         AND "episodeUrl" NOT LIKE '%workers.dev%'
         AND "episodeUrl" LIKE 'http%'
-        ORDER BY "anilistId" ASC, "episodeNumber" ASC
+        ORDER BY CASE WHEN "anilistId" = 206914 THEN 0 ELSE 1 END ASC, "anilistId" ASC, "episodeNumber" ASC
         LIMIT :limit
     """
     rows = await db.fetch_all(query, values={"limit": limit})
