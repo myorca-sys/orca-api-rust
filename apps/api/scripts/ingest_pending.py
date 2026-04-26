@@ -61,12 +61,13 @@ async def ingest_pending(limit: int = 5000):
         should_disconnect = True
         
     query = """
-        SELECT id, "anilistId", "episodeNumber", "episodeUrl" 
-        FROM episodes 
-        WHERE "episodeUrl" NOT LIKE '%tg-proxy%' 
-        AND "episodeUrl" NOT LIKE '%workers.dev%'
-        AND "episodeUrl" LIKE 'http%'
-        ORDER BY CASE WHEN "anilistId" = 206914 THEN 0 ELSE 1 END ASC, "anilistId" ASC, "episodeNumber" ASC
+        SELECT e.id, e."anilistId", e."episodeNumber", e."episodeUrl", m."cleanTitle" as "animeTitle"
+        FROM episodes e
+        JOIN anime_metadata m ON e."anilistId" = m."anilistId"
+        WHERE e."episodeUrl" NOT LIKE '%tg-proxy%' 
+        AND e."episodeUrl" NOT LIKE '%workers.dev%'
+        AND e."episodeUrl" LIKE 'http%'
+        ORDER BY CASE WHEN e."anilistId" = 206914 THEN 0 ELSE 1 END ASC, e."anilistId" ASC, e."episodeNumber" ASC
         LIMIT :limit
     """
     rows = await db.fetch_all(query, values={"limit": limit})
@@ -126,7 +127,8 @@ async def ingest_pending(limit: int = 5000):
                     anilist_id=aid,
                     provider_id=provider_id,
                     episode_number=ep_num,
-                    direct_video_url=direct_url
+                    direct_video_url=direct_url,
+                    anime_title=title
                 )
                 
                 if success:

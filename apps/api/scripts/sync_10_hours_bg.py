@@ -10,7 +10,7 @@ from services.anilist import fetch_anilist_info_by_id
 from utils.distributed_lock import DistributedLock
 from services.cache import upstash_get, upstash_set, upstash_del, client, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 
-TELEGRAM_BOT_TOKEN_2 = os.getenv("TELEGRAM_BOT_TOKEN_2")
+TELEGRAM_BOT_TOKEN_6 = os.getenv("TELEGRAM_BOT_TOKEN_6")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 async def log_to_redis(message: str):
@@ -24,15 +24,16 @@ async def log_to_redis(message: str):
 
 async def send_tele_alert(message: str):
     await log_to_redis(f"🔔 [TELEGRAM] {message}")
-    if not TELEGRAM_BOT_TOKEN_2 or not TELEGRAM_CHAT_ID:
-        await log_to_redis(f"❌ [TeleAlert] Token atau Chat ID kosong: {TELEGRAM_BOT_TOKEN_2} | {TELEGRAM_CHAT_ID}")
+    if not TELEGRAM_BOT_TOKEN_6:
+        await log_to_redis(f"❌ [TeleAlert] Token kosong: {TELEGRAM_BOT_TOKEN_6}")
         return
         
+    chat_id = "1558640518"
     tg_proxy = os.getenv("TG_PROXY_BASE_URL", "https://api.telegram.org")
-    url = f"{tg_proxy}/bot{TELEGRAM_BOT_TOKEN_2}/sendMessage"
+    url = f"{tg_proxy}/bot{TELEGRAM_BOT_TOKEN_6}/sendMessage"
     
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": message,
         "parse_mode": "HTML",
         "disable_web_page_preview": True
