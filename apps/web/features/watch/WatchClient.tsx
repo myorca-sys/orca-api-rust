@@ -204,7 +204,7 @@ export default function WatchClient({ id, episode: initialEpisode, title, poster
   const { data: streamData, isLoading: streamLoading, mutate } = useSWR(
     `stream-${id}-${activeEpisode}`,
     async () => {
-      const res = await fetch(`${API}/api/v2/anime/${id}/episodes/${activeEpisode}/stream`);
+      const res = await fetch(`${API}/api/v2/anime/${id}/episodes/${activeEpisode}/stream?t=${Date.now()}`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },

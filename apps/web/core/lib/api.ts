@@ -46,7 +46,7 @@ export const api = {
   episodes: (id: number | string, init?: RequestInit) => request<{ success: boolean; data: any[] }>(`/api/v2/anime/${id}/episodes`, init),
 
   /** Resolved video sources for an episode */
-  stream: (id: number | string, ep: number | string, init?: RequestInit) => request<{ success: boolean; sources: any[]; downloads?: any[] }>(`/api/v2/anime/${id}/episodes/${ep}/stream`, init),
+  stream: (id: number | string, ep: number | string, init?: RequestInit) => request<{ success: boolean; sources: any[]; downloads?: any[] }>(`/api/v2/anime/${id}/episodes/${ep}/stream?t=${Date.now()}`, init),
 
   /** Series list from provider (v1 — only used as fallback) */
   seriesList: (init?: RequestInit) => request<{ success: boolean; data: any[] }>("/api/series", init),
