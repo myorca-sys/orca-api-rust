@@ -48,7 +48,7 @@ class IngestionEngine:
                     logger.warning(f"[Keep-Alive] Ping failed: {e}")
                 await asyncio.sleep(15)
 
-    async def process_episode(self, episode_id: int, anilist_id: int, provider_id: str, episode_number: float, direct_video_url: str):
+    async def process_episode(self, episode_id: int, anilist_id: int, provider_id: str, episode_number: float, direct_video_url: str, anime_title: str = "Unknown"):
         """
         Full pipeline to ingest a video from a provider, slice it, upload to Telegram, and update DB.
         """
@@ -70,7 +70,7 @@ class IngestionEngine:
                 print(f"[Ingestion] Skipping ingestion for Anime: {anilist_id} | Ep: {episode_number} - Already ingested: {row['episodeUrl']}")
                 return True
                 
-            print(f"[Ingestion] Starting ingestion for Anime: {anilist_id} | Ep: {episode_number} | Provider: {provider_id}")
+            print(f"[Ingestion] Starting ingestion for Anime: {anilist_id} ({anime_title}) | Ep: {episode_number} | Provider: {provider_id}")
             
             filename = f"{provider_id}_{anilist_id}_{episode_number}.mp4"
             local_video_path = None
@@ -108,21 +108,21 @@ class IngestionEngine:
             async def _run_pipeline():
                 nonlocal error_type
                 # 1. Fetch Video Locally
-                await _log_to_redis(f"📥 [DOWNLOADING] Mengunduh video mentah untuk Ep {episode_number}...")
+                await _log_to_redis(f"📥 <b>[DOWNLOADING]</b>\n🎬 <b>Anime:</b> {anime_title}\n📺 <b>Episode:</b> {episode_number}\n⏳ Mengunduh video mentah...")
                 lvp = await self.fetcher.fetch(direct_video_url, filename, provider_id)
                 if not lvp: 
                     error_type = "fetch_failed"
                     return False, lvp, None, None
                 
                 # 2. Slice Video
-                await _log_to_redis(f"✂️ [SLICING] Memotong video menjadi bagian kecil (HLS 5-detik) untuk Ep {episode_number}...")
+                await _log_to_redis(f"✂️ <b>[SLICING]</b>\n🎬 <b>Anime:</b> {anime_title}\n📺 <b>Episode:</b> {episode_number}\n🔪 Memotong video menjadi HLS 5-detik...")
                 m3p = await self.slicer.slice(url=lvp, filename=filename, provider_id=provider_id, segment_time=5)
                 if not m3p: 
                     error_type = "slicing_failed"
                     return False, lvp, m3p, None
                 
                 # 3. Upload to Telegram
-                await _log_to_redis(f"📤 [UPLOADING] Mengunggah potongan HLS ke Telegram secara paralel untuk Ep {episode_number}...")
+                await _log_to_redis(f"📤 <b>[UPLOADING]</b>\n🎬 <b>Anime:</b> {anime_title}\n📺 <b>Episode:</b> {episode_number}\n🚀 Mengunggah potongan HLS ke Telegram secara paralel...")
                 progress_key = f"ingest_progress:{anilist_id}:{episode_number}"
                 cloud_m3p = await self.uploader.process_hls_playlist_parallel(m3p, progress_key=progress_key, max_workers=3)
                 if not cloud_m3p: 
@@ -135,6 +135,8 @@ class IngestionEngine:
                 f_url = f_res.get("url") if f_res else None
                 if not f_url:
                     error_type = "upload_failed"
+                else:
+                    await _log_to_redis(f"✅ <b>[SUCCESS]</b>\n🎬 <b>Anime:</b> {anime_title}\n📺 <b>Episode:</b> {episode_number}\n🔗 Berhasil masuk ke Telegram Database!")
                 return (True, lvp, m3p, f_url) if f_url else (False, lvp, m3p, None)
 
             try:

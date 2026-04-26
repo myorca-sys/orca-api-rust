@@ -91,9 +91,9 @@ class QStashPublisher:
                 print(f"[QStash] Exception publishing ingest to QStash: {e}")
 
     @staticmethod
-    def spawn_batch_worker():
+    def spawn_batch_worker(shard_id: int = 0, total_shards: int = 1):
         import asyncio
-        print("[Queue] Spawning batch ingestion as native asyncio task...")
+        print(f"[Queue] Spawning batch ingestion (Shard {shard_id}/{total_shards}) as native asyncio task...")
         
         async def _run():
             try:
@@ -105,7 +105,7 @@ class QStashPublisher:
                     sys.path.insert(0, api_dir)
                 
                 from scripts.ingest_pending import ingest_pending
-                await ingest_pending(10)
+                await ingest_pending(5000, shard_id, total_shards)
             except Exception as e:
                 print(f"[Queue] Native batch ingest error: {e}")
                 

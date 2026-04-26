@@ -206,15 +206,15 @@ async def admin_ingest_batch(request: Request, background_tasks: BackgroundTasks
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/admin/trigger-auto-ingest")
-async def admin_trigger_auto_ingest(request: Request):
-    """Trigger the sequential hard-stitch auto-ingestion natively."""
+async def admin_trigger_auto_ingest(request: Request, shard_id: int = 0, total_shards: int = 1):
+    """Trigger the sequential hard-stitch auto-ingestion natively with sharding support."""
     admin_key = request.headers.get("x-admin-key") or request.query_params.get("key")
     if admin_key != os.environ.get("ADMIN_API_KEY"):
         raise HTTPException(status_code=403, detail="Unauthorized")
     try:
         from services.queue import QStashPublisher
-        QStashPublisher.spawn_batch_worker()
-        return Response(status_code=200, content="Auto ingestion worker spawned successfully!")
+        QStashPublisher.spawn_batch_worker(shard_id, total_shards)
+        return Response(status_code=200, content=f"Auto ingestion worker spawned successfully! Shard {shard_id}/{total_shards}")
     except Exception as e:
         print(f"[Admin] Error triggering auto ingest: {e}")
         raise HTTPException(status_code=500, detail=str(e))
