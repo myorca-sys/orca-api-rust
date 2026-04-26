@@ -27,7 +27,10 @@ async def send_tele_alert(message: str):
     if not TELEGRAM_BOT_TOKEN_2 or not TELEGRAM_CHAT_ID:
         await log_to_redis(f"❌ [TeleAlert] Token atau Chat ID kosong: {TELEGRAM_BOT_TOKEN_2} | {TELEGRAM_CHAT_ID}")
         return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN_2}/sendMessage"
+        
+    tg_proxy = os.getenv("TG_PROXY_BASE_URL", "https://api.telegram.org")
+    url = f"{tg_proxy}/bot{TELEGRAM_BOT_TOKEN_2}/sendMessage"
+    
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
@@ -40,7 +43,7 @@ async def send_tele_alert(message: str):
             if res.status_code != 200:
                 await log_to_redis(f"❌ [TeleAlert] API Error {res.status_code}: {res.text}")
     except Exception as e:
-        await log_to_redis(f"❌ [TeleAlert] Gagal kirim pesan: {e}")
+        await log_to_redis(f"❌ [TeleAlert] Gagal kirim pesan (Proxy/Network): {str(e) or repr(e)}")
         print(f"[TeleAlert] Gagal kirim pesan: {e}")
 
 async def run_10_hours_sync():

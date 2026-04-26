@@ -25,8 +25,10 @@ async def _send_telegram_alert(msg: str):
     if bot_token and chat_id:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
+                import os
+                tg_proxy = os.getenv("TG_PROXY_BASE_URL", "https://api.telegram.org")
                 await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    f"{tg_proxy}/bot{bot_token}/sendMessage",
                     json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}
                 )
         except Exception:
