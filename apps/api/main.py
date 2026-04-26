@@ -351,11 +351,16 @@ async def health():
     global db_connection_error
     db_ok = False
     error_msg = None
+    db_url_masked = "Not set"
     try:
+        import os
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            db_url_masked = db_url[:20] + "..." + db_url[-20:]
         await database.fetch_one("SELECT 1")
         db_ok = True
     except Exception as e:
         error_msg = str(e)
         import traceback
         error_msg += "\\n" + traceback.format_exc()
-    return {"status": "ok" if db_ok else "degraded", "db": db_ok, "error": error_msg, "startup_error": db_connection_error}
+    return {"status": "ok" if db_ok else "degraded", "db": db_ok, "error": error_msg, "startup_error": db_connection_error, "db_url": db_url_masked}
