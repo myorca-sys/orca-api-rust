@@ -1,7 +1,6 @@
 import HomeView from "@/features/home/HomeView";
 import { api } from "@/core/lib/api";
 
-export const runtime = 'edge';
 export const revalidate = 3600;
 
 export default async function Page() {
@@ -17,7 +16,7 @@ export default async function Page() {
   let errorMsg = null;
 
   try {
-    const res = await api.homeV2();
+    const res = await api.homeV2({ next: { revalidate: 3600 } });
     if (res.success && res.data) {
       hero = res.data.hero || [];
       airing = res.data.airing || [];

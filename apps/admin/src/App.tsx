@@ -14,10 +14,17 @@ interface AnimeRow {
   providerId: string | null;
 }
 
+interface EpisodeRow {
+  id: number;
+  episodeNumber: number;
+  providerId: string;
+  episodeUrl: string;
+}
+
 export default function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [activeTab, setActiveTab] = useState("insights"); // insights, database, ecosystem, cache
+  const [activeTab, setActiveTab] = useState("insights"); 
   
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +39,12 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
+
+  // Modal States
+  const [selectedAnime, setSelectedAnime] = useState<AnimeRow | null>(null);
+  const [episodes, setEpisodes] = useState<EpisodeRow[]>([]);
+  const [epLoading, setEpLoading] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<Record<number, any>>({});
 
   useEffect(() => {
     const savedAuth = localStorage.getItem("orcaSysAuth");
@@ -119,6 +132,42 @@ export default function App() {
     fetchData();
   };
 
+  const fetchAnimeEpisodes = async (anime: AnimeRow) => {
+    setSelectedAnime(anime);
+    setEpisodes([]);
+    setDiagnostics({});
+    setEpLoading(true);
+    try {
+      const key = localStorage.getItem("orcaSysKey") || password;
+      const res = await fetch(`${API}/api/v2/admin/anime/${anime.anilistId}/episodes`, { headers: { 'x-admin-key': key } });
+      const data = await res.json();
+      if (data.success) {
+        setEpisodes(data.data);
+      } else {
+        addLog(`Failed to fetch episodes: ${data.error}`);
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+    setEpLoading(false);
+  };
+
+  const handleDiagnose = async (ep: EpisodeRow) => {
+    setDiagnostics(prev => ({ ...prev, [ep.id]: { loading: true } }));
+    try {
+      const key = localStorage.getItem("orcaSysKey") || password;
+      const res = await fetch(`${API}/api/v2/admin/episode/diagnose`, { 
+        method: "POST", 
+        headers: { 'x-admin-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: ep.episodeUrl })
+      });
+      const data = await res.json();
+      setDiagnostics(prev => ({ ...prev, [ep.id]: { loading: false, result: data } }));
+    } catch (e: any) {
+      setDiagnostics(prev => ({ ...prev, [ep.id]: { loading: false, result: { success: false, status: "Network Error" } } }));
+    }
+  };
+
   const filteredData = useMemo(() => {
     return dbData.filter(item => item.title?.toLowerCase().includes(search.toLowerCase()) || String(item.anilistId).includes(search));
   }, [dbData, search]);
@@ -191,7 +240,7 @@ export default function App() {
       </aside>
 
       {/* Main Container */}
-      <main className="flex-1 md:ml-[280px] min-h-[100dvh] bg-black max-w-5xl md:mx-auto">
+      <main className="flex-1 md:ml-[280px] min-h-[100dvh] bg-black max-w-5xl md:mx-auto relative">
         <div className="p-4 md:p-8 pt-10 pb-8 space-y-8 animate-in fade-in duration-500">
           
           <header className="mb-6 px-2">
@@ -235,8 +284,11 @@ export default function App() {
                       <p className="text-sm text-gray-500">No active tasks in Swarm.</p>
                     ) : (
                       ingestTasks.map((t: any, i) => (
-                        <div key={i} className="flex flex-col gap-2">
-                          <div className="flex justify-between items-center text-sm">
+                        <div key={i} className="flex flex-col gap-2 cursor-pointer" onClick={() => {
+                          const anime = dbData.find(a => String(a.anilistId) === String(t.anilist_id));
+                          if(anime) fetchAnimeEpisodes(anime);
+                        }}>
+                          <div className="flex justify-between items-center text-sm hover:text-purple-400 transition-colors">
                             <span className="font-semibold truncate">ID: {t.anilist_id} <span className="text-gray-500">| Ep {t.episode}</span></span>
                             <span className="text-[10px] text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded font-bold uppercase">{t.progress?.status || 'RUNNING'}</span>
                           </div>
@@ -288,7 +340,7 @@ export default function App() {
                       <div className="p-10 text-center text-gray-500 text-sm">No records matched your criteria.</div>
                     ) : (
                       paginatedData.map((item) => (
-                        <div key={item.anilistId} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors">
+                        <div key={item.anilistId} onClick={() => fetchAnimeEpisodes(item)} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer active:bg-white/10">
                           <div className="flex items-center gap-4 min-w-0">
                             <img src={item.cover} alt="" className="w-12 h-16 rounded-xl object-cover bg-black shrink-0 border border-white/5 shadow-sm" loading="lazy" />
                             <div className="min-w-0">
@@ -403,27 +455,99 @@ export default function App() {
                   <StackRow title="Providers" desc="Oploverz, Samehadaku, Kuronime, Otakudesu" />
                 </div>
               </div>
-
-              <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 overflow-hidden">
-                <div className="p-6 border-b border-white/5">
-                  <h2 className="text-lg font-semibold tracking-tight">Database Schema Documentation</h2>
-                </div>
-                <div className="p-6 space-y-5 text-sm text-gray-300 leading-relaxed font-mono">
-                  <div><strong className="text-white">anime_metadata</strong> — Master record of AniList data, seasons, years, ratings, and localized titles.</div>
-                  <div><strong className="text-white">episodes</strong> — Granular structural table. 1 Row = 1 Episode per Provider. Stores the canonical URL of the episode on the provider's site.</div>
-                  <div><strong className="text-white">video_cache</strong> — Real-time M3U8/MP4 extracted sources. Heavily cached to prevent scraping the same episode twice. Follows strict TTL.</div>
-                  <div><strong className="text-white">watch_history</strong> — Cloud-synced user tracking. Stores precise timestamp drop-off points.</div>
-                  <div><strong className="text-white">user</strong> — BetterAuth-backed user profile with role-based access control and premium subscription status.</div>
-                </div>
-              </div>
             </div>
           )}
 
         </div>
+
+        {/* EPISODE DIAGNOSTIC MODAL */}
+        {selectedAnime && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[#1C1C1E] border border-white/10 rounded-[2rem] w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              
+              <div className="p-6 border-b border-white/5 flex gap-4 items-center bg-black/20">
+                <img src={selectedAnime.cover} alt="" className="w-16 h-24 object-cover rounded-xl shadow-lg border border-white/10" />
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-white truncate">{selectedAnime.title}</h2>
+                  <p className="text-sm text-gray-400 font-mono mt-1">ID: {selectedAnime.anilistId} • Episodes: {selectedAnime.episode_count}</p>
+                  <button 
+                    onClick={() => {
+                      if(confirm("Force Re-Ingest anime ini?")) {
+                        handleAction(`/api/v2/anime/${selectedAnime.anilistId}/debug-sync`, "Force Re-Ingest");
+                      }
+                    }}
+                    className="mt-3 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                  >
+                    Force Re-Ingest All
+                  </button>
+                </div>
+                <button onClick={() => setSelectedAnime(null)} className="p-2 bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-full transition-colors self-start">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2 bg-black/10 custom-scrollbar">
+                {epLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : episodes.length === 0 ? (
+                  <div className="text-center p-10 text-gray-500 text-sm">Tidak ada episode tersimpan di database.</div>
+                ) : (
+                  <div className="space-y-2 p-2">
+                    {episodes.map(ep => {
+                      const diag = diagnostics[ep.id];
+                      const isTg = ep.episodeUrl.includes('tg-proxy') || ep.episodeUrl.includes('workers.dev');
+                      return (
+                        <div key={ep.id} className="bg-[#1C1C1E] border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-white/5 transition-colors">
+                          <div className="w-12 h-12 rounded-xl bg-black flex flex-col items-center justify-center shrink-0 border border-white/5">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase">EP</span>
+                            <span className="text-lg font-black text-white leading-none">{ep.episodeNumber}</span>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">{ep.providerId}</span>
+                              {isTg && <span className="text-[9px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">TG PROXY</span>}
+                            </div>
+                            <div className="text-[11px] text-gray-500 font-mono truncate w-full" title={ep.episodeUrl}>
+                              {ep.episodeUrl}
+                            </div>
+
+                            {diag?.result && (
+                              <div className={`mt-2 text-xs font-bold px-2 py-1 rounded w-fit ${diag.result.healthy ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                {diag.result.healthy ? '✅ Healthy' : '❌ Error'} • {diag.result.status}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="shrink-0 flex gap-2">
+                            {isTg && (
+                              <button 
+                                onClick={() => handleDiagnose(ep)}
+                                disabled={diag?.loading}
+                                className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 transition-colors w-full sm:w-auto"
+                              >
+                                {diag?.loading ? 'Scanning...' : 'Diagnose'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* Mobile Bottom Dock */}
-      <nav className="md:hidden fixed bottom-6 inset-x-6 z-50">
+      <nav className="md:hidden fixed bottom-6 inset-x-6 z-40">
          <div className="bg-[#1C1C1E]/80 backdrop-blur-3xl border border-white/10 rounded-3xl p-2 flex justify-between shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)]">
            <DockItem active={activeTab === 'insights'} onClick={() => setActiveTab('insights')} icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" label="Insights" />
            <DockItem active={activeTab === 'database'} onClick={() => setActiveTab('database')} icon="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" label="Database" />

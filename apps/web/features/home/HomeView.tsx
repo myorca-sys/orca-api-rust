@@ -1,12 +1,8 @@
-// features/home/HomeView.tsx — Apple HIG Style
-
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { HomeSearchBar } from "./HomeSearchBar";
-import { HomeGenreGrid } from "./HomeGenreGrid";
 import { ContinueWatching } from "./ContinueWatching";
-import { AnimeRow } from "@/ui/cards/AnimeRow";
-import { SpecialPopularRow } from "@/ui/cards/SpecialPopularRow";
 import { LatestGrid } from "@/ui/cards/LatestGrid";
 import { authClient } from "@/core/lib/auth-client";
 import { OrcaLogo } from "@/ui/icons/OrcaLogo";
@@ -19,6 +15,30 @@ const greet = () => {
   return "Konbanwa";
 };
 
+// Lazy rendering wrapper untuk performa 0ms dan meringankan DOM HP
+function LazySection({ children, minHeight = "400px" }: { children: React.ReactNode, minHeight?: string }) {
+  const [inView, setInView] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setInView(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "300px" }); // Render lebih awal sebelum user sampai
+
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ minHeight: inView ? "auto" : minHeight }}>
+      {inView ? children : null}
+    </div>
+  );
+}
+
 export default function HomeView({ 
   initialHero = [], 
   initialAiring = [],
@@ -26,9 +46,7 @@ export default function HomeView({
   initialPopular = [],
   initialCompleted = [],
   initialTopRated = [],
-  initialIsekai = [],
   initialMovies = [],
-  initialTrending = []
 }: { 
   initialHero?: any[]; 
   initialAiring?: any[];
@@ -36,16 +54,32 @@ export default function HomeView({
   initialPopular?: any[]; 
   initialCompleted?: any[];
   initialTopRated?: any[];
-  initialIsekai?: any[];
   initialMovies?: any[];
-  initialTrending?: any[];
+  initialIsekai?: any[]; // Keep for prop compatibility with server page
+  initialTrending?: any[]; // Keep for prop compatibility
 }) {
   const { data: session } = authClient.useSession();
   const user = session?.user;
 
+  // 1. Gabungkan Tayangan Terbaru + Airing (Deduplikasi)
+  const ongoingMap = new Map();
+  [...initialLatest, ...initialAiring].forEach(i => {
+    const id = String(i.anilistId || i.id);
+    if (!ongoingMap.has(id)) ongoingMap.set(id, i);
+  });
+  const ongoingItems = Array.from(ongoingMap.values());
+
+  // 2. Gabungkan Populer + Skor Tertinggi + Tamat (Deduplikasi)
+  const bestMap = new Map();
+  [...initialPopular, ...initialTopRated, ...initialCompleted].forEach(i => {
+    const id = String(i.anilistId || i.id);
+    if (!bestMap.has(id)) bestMap.set(id, i);
+  });
+  const bestItems = Array.from(bestMap.values());
+
   return (
     <div className="w-full pb-24 bg-black min-h-screen text-white selection:bg-[#0A84FF]/30">
-      {/* Dynamic Orca Logo */}
+      {/* Static Orca Logo */}
       <div className="px-6 md:px-10 pt-8 pb-2">
         <h1 className="text-[28px] font-black text-white tracking-tight flex items-center gap-2">
           <OrcaLogo className="w-8 h-8 text-white" animated={false} />
@@ -53,7 +87,7 @@ export default function HomeView({
         </h1>
       </div>
 
-      {/* Top Header Section — HIG: Minimalist & Spaced */}
+      {/* Top Header Section — Minimalist */}
       <div className="pt-4 pb-8 anim-fade">
         <div className="px-6 md:px-10 flex items-center gap-2 mb-6">
           <div className="w-2 h-2 rounded-full bg-[#32D74B] shadow-[0_0_8px_#32D74B]" />
@@ -62,15 +96,8 @@ export default function HomeView({
           </p>
         </div>
 
-        {/* Continue Watching Section — HIG: Utility First */}
+        {/* Continue Watching Section */}
         <ContinueWatching userId={user?.id} />
-
-        <div className="px-6 md:px-10 mt-4">
-          <h1 className="text-[34px] md:text-[42px] font-black tracking-[-0.03em] leading-[1.05]">
-            Temukan anime<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#8e8e93]">favorit barumu.</span>
-          </h1>
-        </div>
       </div>
 
       {/* Search Bar Section */}
@@ -80,27 +107,30 @@ export default function HomeView({
         </div>
       </div>
 
-      {/* Latest Airing (Vertical Grid) */}
-      <LatestGrid title="Tayangan Terbaru" items={initialLatest} isNew={true} />
+      {/* Section 1: Ongoing (Render immediately as it's above the fold) */}
+      {ongoingItems.length > 0 && (
+        <LatestGrid title="Sedang Tayang & Terbaru" items={ongoingItems} isNew={true} />
+      )}
 
-      <div className="space-y-12">
-        {/* Rows — HIG: Content is King */}
-        {initialAiring.length > 0 && <AnimeRow title="Sedang Tayang (Airing)" items={initialAiring} />}
-        {initialTrending.length > 0 && <SpecialPopularRow title="Populer Saat Ini" items={initialTrending} />}
+      {/* Lazy Sections for heavy components below the fold */}
+      <div className="space-y-4">
+        {/* Section 2: Best Completed */}
+        {bestItems.length > 0 && (
+          <LazySection>
+            <LatestGrid title="Anime Tamat Terbaik" items={bestItems} />
+          </LazySection>
+        )}
         
-        <HomeGenreGrid />
-        
-        {initialPopular.length > 0 && <AnimeRow title="Terpopuler Sepanjang Masa" items={initialPopular} />}
-        {initialTopRated.length > 0 && <AnimeRow title="Skor Tertinggi" items={initialTopRated} />}
-        
-        {initialCompleted.length > 0 && <LatestGrid title="Anime Tamat Terbaik" items={initialCompleted} />}
-        {initialIsekai.length > 0 && <AnimeRow title="Dunia Fantasi & Isekai" items={initialIsekai} />}
-        {initialMovies.length > 0 && <AnimeRow title="Film Anime (Movies)" items={initialMovies} />}
+        {/* Section 3: Movies */}
+        {initialMovies.length > 0 && (
+          <LazySection>
+            <LatestGrid title="Film Anime (Movies)" items={initialMovies} />
+          </LazySection>
+        )}
       </div>
       
-      {/* Visual Explainer Placeholder / Decorative Gradient */}
+      {/* Decorative Gradient */}
       <div className="fixed bottom-0 left-0 w-full h-[150px] pointer-events-none bg-gradient-to-t from-black to-transparent opacity-60 z-10" />
     </div>
   );
 }
-

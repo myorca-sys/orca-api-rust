@@ -7,7 +7,7 @@ import { useMounted } from "@/core/hooks/use-mounted";
 import { useKonami } from "@/core/hooks/use-konami";
 import { useViewTransition } from "@/core/hooks/use-view-transition";
 import { SnakeGame } from "@/ui/games/SnakeGame";
-import { useState, useRef, TouchEvent } from "react";
+import { useState } from "react";
 import { authClient } from "@/core/lib/auth-client";
 
 const TABS = [
@@ -25,66 +25,13 @@ export function Navigation({ children }: { children: React.ReactNode }) {
   const [snakeActive, setSnakeActive] = useState(false);
   const { data: session } = authClient.useSession();
 
-  // Swipe detection refs
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const touchEnd = useRef<{ x: number; y: number } | null>(null);
-  const minSwipeDistance = 100; // minimal piksel yang harus digeser
-
   useKonami(() => setSnakeActive(true));
 
   // Determine if current route is exactly one of the main tabs
   const isMainTab = TABS.some(t => pathname === t.id);
 
-  // Swipe handlers
-  const onTouchStart = (e: TouchEvent) => {
-    if (!isMainTab) return;
-    
-    // Abaikan swipe global jika user sedang menyentuh elemen carousel/slider (horizontal scroll)
-    const target = e.target as HTMLElement;
-    if (target.closest('.overflow-x-auto') || target.closest('.snap-x')) {
-      return; 
-    }
-
-    touchEnd.current = null;
-    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
-  };
-
-  const onTouchMove = (e: TouchEvent) => {
-    if (!isMainTab) return;
-    touchEnd.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart.current || !touchEnd.current || !isMainTab) return;
-    
-    const distanceX = touchStart.current.x - touchEnd.current.x;
-    const distanceY = touchStart.current.y - touchEnd.current.y;
-    const isLeftSwipe = distanceX > minSwipeDistance;
-    const isRightSwipe = distanceX < -minSwipeDistance;
-    const isHorizontal = Math.abs(distanceX) > Math.abs(distanceY) * 2; // Pastikan geseran dominan horizontal, bukan vertical scroll
-
-    if (isHorizontal) {
-      const currentIndex = TABS.findIndex(t => t.id === pathname);
-      if (currentIndex !== -1) {
-        if (isLeftSwipe && currentIndex < TABS.length - 1) {
-          // Geser layar ke kiri -> pindah ke tab berikutnya (kanan)
-          router.push(TABS[currentIndex + 1].id);
-        }
-        if (isRightSwipe && currentIndex > 0) {
-          // Geser layar ke kanan -> pindah ke tab sebelumnya (kiri)
-          router.push(TABS[currentIndex - 1].id);
-        }
-      }
-    }
-  };
-
   return (
-    <div 
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      className="w-full min-h-[100dvh] bg-[#121212] text-white flex flex-col relative select-none antialiased min-w-0 transition-colors duration-500"
-    >
+    <div className="w-full min-h-[100dvh] bg-[#121212] text-white flex flex-col relative select-none antialiased min-w-0 transition-colors duration-500">
       {/* Main content */}
       <div className="flex-1 w-full min-h-[100dvh] relative flex flex-col min-w-0">
         <main className={`flex-1 w-full min-w-0 ${mounted && isMainTab ? 'pb-[100px]' : 'pb-0'}`}>
