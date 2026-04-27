@@ -84,10 +84,18 @@ async def _download_chunk(
                             logger.warning(f"[Fetcher] Chunk {chunk_index} HTTP {r.status_code}, retry {attempt+1}")
                             await asyncio.sleep(2 ** attempt)
                             continue
+                        written = 0
                         with open(output_path, "r+b") as f:
                             f.seek(start)
                             async for data in r.aiter_bytes(chunk_size=65536):
                                 f.write(data)
+                                written += len(data)
+                        
+                        expected_bytes = end - start + 1
+                        if written != expected_bytes:
+                            logger.warning(f"[Fetcher] Chunk {chunk_index} incomplete: {written}/{expected_bytes} bytes. Retrying...")
+                            raise Exception("Incomplete chunk download")
+                            
                         logger.info(f"[Fetcher] Chunk {chunk_index} OK ({start}-{end})")
                         return True
             except Exception as e:
