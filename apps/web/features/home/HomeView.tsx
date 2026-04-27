@@ -48,7 +48,7 @@ export default function HomeView({
       {/* Dynamic Orca Logo */}
       <div className="px-6 md:px-10 pt-8 pb-2">
         <h1 className="text-[28px] font-black text-white tracking-tight flex items-center gap-2">
-          <OrcaLogo className="w-8 h-8 text-white" animated={true} />
+          <OrcaLogo className="w-8 h-8 text-white" animated={false} />
           Orca<span className="text-[#0A84FF]">.</span>
         </h1>
       </div>

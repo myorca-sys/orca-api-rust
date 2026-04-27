@@ -7,6 +7,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Orca",
   description: "Platform streaming anime premium minimalis — cepat, elegan, gratis.",
+  icons: {
+    icon: "/api/icon?size=32&dark=true",
+    apple: "/api/icon?size=192&dark=true"
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

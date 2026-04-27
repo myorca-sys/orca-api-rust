@@ -17,9 +17,8 @@ interface AnimeRow {
 export default function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("insights"); // insights, database, ecosystem, cache
   
-  const [targetId, setTargetId] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -28,226 +27,134 @@ export default function App() {
   const [cacheStats, setCacheStats] = useState<any>(null);
   const [ingestTasks, setIngestTasks] = useState<any[]>([]);
 
+  // DB States
+  const [dbData, setDbData] = useState<AnimeRow[]>([]);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
   useEffect(() => {
-    const savedAuth = localStorage.getItem("adminAuth");
-    const savedKey = localStorage.getItem("adminKey");
+    const savedAuth = localStorage.getItem("orcaSysAuth");
+    const savedKey = localStorage.getItem("orcaSysKey");
     if (savedAuth === "true" && savedKey) {
       setPassword(savedKey);
       setAuth(true);
     }
   }, []);
-  
-  const [dbData, setDbData] = useState<AnimeRow[]>([]);
-  const [filterGenre, setFilterGenre] = useState<string>("All");
-  const [filterEps, setFilterEps] = useState<string>("All");
-  const [search, setSearch] = useState("");
 
   const addLog = (msg: string) => {
-    setLogs((prev) => {
-      const newLogs = [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50);
-      localStorage.setItem("adminLogs", JSON.stringify(newLogs));
-      return newLogs;
-    });
+    setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
   };
 
-  useEffect(() => {
-    const savedLogs = localStorage.getItem("adminLogs");
-    if (savedLogs) {
-      try {
-        setLogs(JSON.parse(savedLogs));
-      } catch(e) {}
-    }
-  }, []);
+  const fetchData = () => {
+    const key = localStorage.getItem("orcaSysKey") || password;
+    const headers = { 'x-admin-key': key };
 
-  const fetchData = async () => {
-    const key = localStorage.getItem("adminKey") || password;
-    try {
-      const resStats = await fetch(`${API}/api/v2/admin/stats`);
-      if (resStats.ok) {
-        const dataStats = await resStats.json();
-        if (dataStats.success) {
-          setStats({ total_anime: dataStats.total_anime, total_episodes: dataStats.total_episodes });
-          setIngestionStats({
-             ingested: dataStats.ingested_episodes || 0,
-             pending: dataStats.pending_episodes || 0
-          });
+    fetch(`${API}/api/v2/admin/stats`, { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success) {
+          setStats({ total_anime: data.total_anime, total_episodes: data.total_episodes });
+          setIngestionStats({ ingested: data.ingested_episodes || 0, pending: data.pending_episodes || 0 });
         }
-      }
+      }).catch(console.error);
 
-      const resDb = await fetch(`${API}/api/v2/admin/database`);
-      if (resDb.ok) {
-        const dataDb = await resDb.json();
-        if (dataDb.success) setDbData(dataDb.data);
-      }
-      
-      const resCache = await fetch(`${API}/api/v2/admin/cache-stats`, { 
-        headers: { 'x-admin-key': key }
-      });
-      if (resCache.ok) {
-        const dataCache = await resCache.json();
-        setCacheStats(dataCache);
-      }
+    fetch(`${API}/api/v2/admin/cache-stats`, { headers })
+      .then(async res => {
+        if (res.ok) setCacheStats(await res.json());
+        else if (res.status === 401) setCacheStats({ error: "Invalid Admin Key / Unauthorized" });
+      }).catch(console.error);
 
-      const resTasks = await fetch(`${API}/api/v2/admin/ingest-stats`, { 
-        headers: { 'x-admin-key': key }
-      });
-      if (resTasks.ok) {
-        const dataTasks = await resTasks.json();
-        if (dataTasks.success) {
-          setIngestTasks(dataTasks.active_tasks || []);
-        }
-      }
-      
-    } catch (e) {
-      console.error("Failed to fetch data", e);
-    }
+    fetch(`${API}/api/v2/admin/ingest-stats`, { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success) setIngestTasks(data.active_tasks || []);
+      }).catch(console.error);
+
+    fetch(`${API}/api/v2/admin/database`, { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success) setDbData(data.data);
+      }).catch(console.error);
   };
 
   useEffect(() => {
     if (!auth) return;
-    
     fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, 5000);
-    
+    const interval = setInterval(fetchData, 8000);
     return () => clearInterval(interval);
   }, [auth]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length > 0) {
+    if (password === "26cd52813fbce8e25ccecea02540dd0d642b462f9f4cd1cb") {
       setAuth(true);
-      localStorage.setItem("adminAuth", "true");
-      localStorage.setItem("adminKey", password);
+      localStorage.setItem("orcaSysAuth", "true");
+      localStorage.setItem("orcaSysKey", password);
+    } else {
+      alert("❌ Akses Ditolak: Passcode tidak valid.");
+      setPassword("");
     }
   };
 
   const handleLogout = () => {
     setAuth(false);
     setPassword("");
-    localStorage.removeItem("adminAuth");
-    localStorage.removeItem("adminKey");
+    localStorage.removeItem("orcaSysAuth");
+    localStorage.removeItem("orcaSysKey");
   };
 
-  const handlePrefetch = async () => {
+  const handleAction = async (endpoint: string, label: string) => {
     setLoading(true);
-    addLog(`🚀 Memicu Smart Pre-fetch (Ongoing Anime) di Background...`);
+    addLog(`Initiating: ${label}...`);
     try {
-      const key = localStorage.getItem("adminKey") || password;
-      const res = await fetch(`${API}/api/v2/admin/trigger-prefetch`, { 
-        method: "POST",
-        headers: { 'x-admin-key': key }
-      });
+      const key = localStorage.getItem("orcaSysKey") || password;
+      const res = await fetch(`${API}${endpoint}`, { method: "POST", headers: { 'x-admin-key': key } });
       const data = await res.json();
-      addLog(data.success ? `✅ Sukses: ${data.message}` : `❌ Gagal: ${data.error || 'Unauthorized'}`);
+      addLog(data.success ? `Success: ${data.message}` : `Failed: ${data.error || 'Unauthorized'}`);
     } catch (e: any) {
-      addLog(`❌ Error: ${e.message}`);
-    }
-    setLoading(false);
-  };
-
-  const handleSync = async (idToSync: string) => {
-    if (!idToSync) return;
-    setLoading(true);
-    addLog(`🔍 Mengekstrak ID Anilist: ${idToSync}...`);
-    
-    try {
-      const res = await fetch(`${API}/api/v2/anime/${idToSync}/debug-sync`);
-      const data = await res.json();
-      if (data.success) {
-        addLog(`✅ Sukses [ID ${idToSync}]: ${data.result?.synced || 0} episode disinkronkan.`);
-      } else {
-        addLog(`❌ Gagal [ID ${idToSync}]: ${data.error || "Unknown Error"}`);
-      }
-    } catch (e: any) {
-      addLog(`❌ Error koneksi: ${e.message}`);
-    }
-    
-    setLoading(false);
-    fetchData();
-  };
-
-  const handleMassSync = async () => {
-    setLoading(true);
-    addLog(`🚀 Mengirim 100 Anime Terbaru ke Sinkronisasi Massal...`);
-    try {
-      const key = localStorage.getItem("adminKey") || password;
-      const res = await fetch(`${API}/api/v2/admin/mass-sync`, { 
-        method: "POST",
-        headers: { 'x-admin-key': key }
-      });
-      const data = await res.json();
-      addLog(data.success ? `✅ Sukses: ${data.message}` : `❌ Gagal: ${data.error}`);
-    } catch (e: any) {
-      addLog(`❌ Error: ${e.message}`);
-    }
-    setLoading(false);
-  };
-
-  const handleSyncMissing = async () => {
-    setLoading(true);
-    addLog(`🔎 Memasukkan semua anime "0 Episode" ke antrean...`);
-    try {
-      const key = localStorage.getItem("adminKey") || password;
-      const res = await fetch(`${API}/api/v2/admin/sync-missing`, { 
-        method: "POST",
-        headers: { 'x-admin-key': key }
-      });
-      const data = await res.json();
-      addLog(data.success ? `✅ ${data.message}` : `❌ Gagal: ${data.error}`);
-    } catch (e: any) {
-      addLog(`❌ Error: ${e.message}`);
+      addLog(`Network Error: ${e.message}`);
     }
     setLoading(false);
     fetchData();
   };
-
-  const allGenres = useMemo(() => {
-    const genres = new Set<string>();
-    dbData.forEach(item => {
-      if (Array.isArray(item.genres)) {
-        item.genres.forEach(g => genres.add(g));
-      }
-    });
-    return Array.from(genres).sort();
-  }, [dbData]);
 
   const filteredData = useMemo(() => {
-    return dbData.filter(item => {
-      const matchSearch = item.title?.toLowerCase().includes(search.toLowerCase()) || String(item.anilistId).includes(search);
-      let matchGenre = true;
-      if (filterGenre !== "All") {
-        matchGenre = Array.isArray(item.genres) ? item.genres.includes(filterGenre) : false;
-      }
-      let matchEps = true;
-      if (filterEps === "Zero") matchEps = item.episode_count === 0;
-      if (filterEps === "HasEps") matchEps = item.episode_count > 0;
+    return dbData.filter(item => item.title?.toLowerCase().includes(search.toLowerCase()) || String(item.anilistId).includes(search));
+  }, [dbData, search]);
 
-      return matchSearch && matchGenre && matchEps;
-    });
-  }, [dbData, search, filterGenre, filterEps]);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredData.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
 
   if (!auth) {
     return (
-      <div className="min-h-screen bg-[#0a0c10] flex items-center justify-center font-sans">
-        <div className="bg-[#1c1c1e] p-8 rounded-2xl border border-white/10 w-full max-w-sm">
-          <div className="flex items-center justify-center mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#30d158] flex items-center justify-center shadow-[0_0_20px_rgba(10,132,255,0.3)]">
-               <span className="text-white font-black text-xl">A</span>
-            </div>
+      <div className="min-h-[100dvh] bg-black flex flex-col items-center justify-center font-sans text-white p-6 antialiased">
+        <div className="w-full max-w-xs space-y-8 animate-in slide-in-from-bottom-8 fade-in duration-700">
+          <div className="flex flex-col items-center space-y-4">
+             <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-[1.5rem] shadow-[0_10px_40px_-10px_rgba(168,85,247,0.5)] flex items-center justify-center">
+               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+               </svg>
+             </div>
+             <div className="text-center">
+               <h1 className="text-2xl font-bold tracking-tight">System Restricted</h1>
+               <p className="text-sm text-gray-400 mt-1">Provide passcode to access telemetry.</p>
+             </div>
           </div>
-          <h1 className="text-2xl font-black text-white mb-2 text-center">Control Center</h1>
-          <p className="text-[#8e8e93] text-sm text-center mb-6">Orca Administration</p>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} className="space-y-4">
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Admin API Key..." 
-              className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white mb-4 focus:outline-none focus:border-[#0a84ff] font-mono text-sm"
+              placeholder="Passcode"
+              autoFocus
+              className="w-full bg-[#1C1C1E] border border-white/5 rounded-[1.2rem] px-5 py-4 text-center tracking-[0.5em] text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-lg transition-all shadow-inner"
             />
-            <button type="submit" className="w-full bg-[#0a84ff] text-white font-bold py-3 rounded-xl hover:bg-blue-600 transition-colors shadow-[0_0_15px_rgba(10,132,255,0.4)]">
+            <button type="submit" className="w-full bg-white text-black font-bold py-4 rounded-[1.2rem] hover:bg-gray-200 transition-transform active:scale-95 shadow-[0_5px_20px_-5px_rgba(255,255,255,0.3)]">
               Authenticate
             </button>
           </form>
@@ -257,368 +164,347 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-white flex flex-col md:flex-row font-sans">
+    <div className="min-h-[100dvh] bg-black text-white font-sans pb-24 md:pb-0 md:flex antialiased selection:bg-purple-500/30">
       
-      {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-[#1c1c1e] border-r border-white/10 flex flex-col">
-        <div className="p-6 border-b border-white/10 flex items-center gap-3">
-           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0a84ff] to-[#30d158] flex items-center justify-center">
-              <span className="text-white font-black text-sm">PRO</span>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-[280px] bg-[#1C1C1E]/50 border-r border-white/5 flex-col fixed inset-y-0 z-50 backdrop-blur-2xl">
+        <div className="p-8 pb-6 flex flex-col gap-3 border-b border-white/5">
+           <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-[1rem] flex items-center justify-center shadow-lg">
+             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+               <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+             </svg>
            </div>
            <div>
-             <h2 className="font-black text-white tracking-tight leading-none">AnimeAdmin</h2>
-             <span className="text-[10px] text-[#30d158] uppercase font-bold tracking-widest">System Online</span>
+             <h2 className="font-bold text-xl tracking-tight leading-none">Telemetry</h2>
+             <span className="text-[10px] text-green-400 font-bold tracking-widest uppercase flex items-center gap-1.5 mt-1.5">
+               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> All Systems Nominal
+             </span>
            </div>
         </div>
         
-        <nav className="p-4 flex-1 space-y-2">
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 ${activeTab === 'dashboard' ? 'bg-[#0a84ff]/20 text-[#0a84ff]' : 'text-[#8e8e93] hover:bg-white/5 hover:text-white'}`}
-          >
-            📊 Dashboard
-          </button>
-          <button 
-            onClick={() => setActiveTab('database')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 ${activeTab === 'database' ? 'bg-[#0a84ff]/20 text-[#0a84ff]' : 'text-[#8e8e93] hover:bg-white/5 hover:text-white'}`}
-          >
-            🗄️ Database Explorer
-          </button>
-          <button 
-            onClick={() => setActiveTab('cache')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 ${activeTab === 'cache' ? 'bg-[#0a84ff]/20 text-[#0a84ff]' : 'text-[#8e8e93] hover:bg-white/5 hover:text-white'}`}
-          >
-            ⚡ Stream Cache Engine
-          </button>
+        <nav className="p-4 flex-1 space-y-1.5 overflow-y-auto">
+          <SidebarItem active={activeTab === 'insights'} onClick={() => setActiveTab('insights')} icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" label="Insights" />
+          <SidebarItem active={activeTab === 'database'} onClick={() => setActiveTab('database')} icon="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" label="Database" />
+          <SidebarItem active={activeTab === 'cache'} onClick={() => setActiveTab('cache')} icon="M13 10V3L4 14h7v7l9-11h-7z" label="Edge Cache" />
+          <SidebarItem active={activeTab === 'ecosystem'} onClick={() => setActiveTab('ecosystem')} icon="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" label="Ecosystem" />
         </nav>
-
-        <div className="p-4 border-t border-white/10">
-           <button onClick={handleLogout} className="w-full py-2 text-sm text-[#ff453a] font-bold hover:bg-[#ff453a]/10 rounded-lg transition-colors">
-              Disconnect
-           </button>
-        </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        
-        {/* --- TAB: DASHBOARD --- */}
-        {activeTab === 'dashboard' && (
-          <div className="max-w-6xl mx-auto space-y-6">
-            <h1 className="text-3xl font-black mb-6 tracking-tight">System Overview</h1>
-            
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">🎬</div>
-                <p className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-widest mb-1">Total Anime</p>
-                <p className="text-4xl font-black text-white">{stats?.total_anime || 0}</p>
-              </div>
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📼</div>
-                <p className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-widest mb-1">Total Episodes</p>
-                <p className="text-4xl font-black text-[#0a84ff]">{stats?.total_episodes || 0}</p>
-              </div>
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">🚀</div>
-                <p className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-widest mb-1">Swarm Ingested</p>
-                <p className="text-4xl font-black text-[#30d158]">{ingestionStats?.ingested || 0}</p>
-              </div>
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">⏳</div>
-                <p className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-widest mb-1">Pending Ingest</p>
-                <p className="text-4xl font-black text-[#ff9f0a]">{ingestionStats?.pending || 0}</p>
-              </div>
-            </div>
+      {/* Main Container */}
+      <main className="flex-1 md:ml-[280px] min-h-[100dvh] bg-black max-w-5xl md:mx-auto">
+        <div className="p-4 md:p-8 pt-10 pb-8 space-y-8 animate-in fade-in duration-500">
+          
+          <header className="mb-6 px-2">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight capitalize">{activeTab}</h1>
+          </header>
 
-            {/* Action Center & Logs */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 space-y-4">
-                <h2 className="text-sm font-bold text-[#8e8e93] uppercase tracking-widest flex items-center gap-2">
-                  🛠️ Mission Control
-                </h2>
-                <button onClick={handlePrefetch} disabled={loading} className="w-full bg-[#0a84ff]/20 hover:bg-[#0a84ff]/30 text-[#0a84ff] font-bold p-3 rounded-xl border border-[#0a84ff]/50 disabled:opacity-50 transition-all text-xs">
-                  🚀 Trigger Smart Pre-fetch (Ongoing Anime to Telegram)
-                </button>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={handleMassSync} disabled={loading} className="bg-[#30d158]/20 hover:bg-[#30d158]/30 text-[#30d158] font-bold p-3 rounded-xl border border-[#30d158]/50 disabled:opacity-50 transition-all text-xs">
-                    1. Sinkronisasi Massal
-                  </button>
-                  <button onClick={handleSyncMissing} disabled={loading} className="bg-[#ff453a]/20 hover:bg-[#ff453a]/30 text-[#ff453a] font-bold p-3 rounded-xl border border-[#ff453a]/50 disabled:opacity-50 transition-all text-xs">
-                    2. Retry 0 Episode
-                  </button>
+          {/* --- TAB: INSIGHTS --- */}
+          {activeTab === 'insights' && (
+            <div className="space-y-8">
+              <section>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <MetricBox label="Indexed Anime" value={stats?.total_anime || "--"} color="text-white" />
+                  <MetricBox label="Total Episodes" value={stats?.total_episodes || "--"} color="text-indigo-400" />
+                  <MetricBox label="Swarm Proxy" value={ingestionStats?.ingested || "--"} color="text-purple-400" />
+                  <MetricBox label="Pending Sync" value={ingestionStats?.pending || "--"} color="text-orange-400" />
                 </div>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={targetId}
-                    onChange={(e) => setTargetId(e.target.value)}
-                    placeholder="Target ID Spesifik (Cth: 182205)"
-                    className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#0a84ff] text-white"
-                  />
-                  <button onClick={() => handleSync(targetId)} disabled={loading || !targetId} className="bg-[#0a84ff] hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
-                    Scrape Manual
-                  </button>
+              </section>
+
+              <section className="bg-[#1C1C1E] rounded-[2rem] p-6 border border-white/5 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold tracking-tight">Mission Control</h2>
                 </div>
-              </div>
-              
-              <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-5 h-[240px] flex flex-col shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <h2 className="text-sm font-bold text-[#8e8e93] uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#ff9f0a] animate-pulse" /> Live Ingestion Tasks
-                </h2>
-                <div className="flex-1 overflow-y-auto font-mono text-[11px] text-white space-y-2">
-                  {ingestTasks.length === 0 ? (
-                    <span className="text-white/30">Tidak ada task ingestion yang aktif...</span>
-                  ) : (
-                    ingestTasks.map((t: any, i) => (
-                      <div key={i} className="flex flex-col bg-black border border-white/10 p-2 rounded-lg">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-[#0a84ff]">ID: {t.anilist_id} | Ep: {t.episode}</span>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase ${
-                            t.progress?.status === 'processing' ? 'bg-[#ff9f0a]/20 text-[#ff9f0a]' : 
-                            t.progress === 'DONE' ? 'bg-[#30d158]/20 text-[#30d158]' : 
-                            'bg-[#8e8e93]/20 text-[#8e8e93]'
-                          }`}>
-                            {t.progress?.status || (typeof t.progress === 'string' ? t.progress : 'UNKNOWN')}
-                          </span>
-                        </div>
-                        {t.progress?.progress && (
-                          <div className="w-full bg-white/10 rounded-full h-1.5 mt-1">
-                            <div className="bg-[#0a84ff] h-1.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, parseInt(t.progress.progress)))}%` }}></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ListButton onClick={() => handleAction('/api/v2/admin/trigger-prefetch', 'Smart Pre-fetch')} title="Execute Smart Pre-fetch" subtitle="Ongoing anime -> Telegram Swarm" icon="M13 10V3L4 14h7v7l9-11h-7z" color="bg-indigo-500" loading={loading} />
+                  <ListButton onClick={() => handleAction('/api/v2/admin/mass-sync', 'Mass Sync')} title="Force Mass Synchronization" subtitle="Deep sync for top 100 recent updates" icon="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" color="bg-purple-500" loading={loading} />
+                  <ListButton onClick={() => handleAction('/api/v2/admin/sync-missing', 'Retry 0 Eps')} title="Retry Missing Episodes" subtitle="Re-evaluate anime with 0 episodes" icon="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" color="bg-orange-500" loading={loading} />
+                  <ListButton onClick={() => {
+                    const id = prompt("Target AniList ID:");
+                    if(id) handleAction(`/api/v2/anime/${id}/debug-sync`, `Manual Scrape ID ${id}`);
+                  }} title="Manual ID Scrape" subtitle="Force sync a specific AniList ID" icon="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" color="bg-gray-500" loading={loading} />
+                </div>
+              </section>
+
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 p-6 h-80 flex flex-col">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" /> Active Ingestions
+                  </h3>
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                    {ingestTasks.length === 0 ? (
+                      <p className="text-sm text-gray-500">No active tasks in Swarm.</p>
+                    ) : (
+                      ingestTasks.map((t: any, i) => (
+                        <div key={i} className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-semibold truncate">ID: {t.anilist_id} <span className="text-gray-500">| Ep {t.episode}</span></span>
+                            <span className="text-[10px] text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded font-bold uppercase">{t.progress?.status || 'RUNNING'}</span>
                           </div>
-                        )}
-                        {t.progress?.progress && <span className="text-[9px] text-[#8e8e93] mt-1 text-right">{t.progress.progress}%</span>}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-black border border-white/10 rounded-2xl p-5 h-[240px] flex flex-col shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <h2 className="text-sm font-bold text-[#8e8e93] uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#30d158] animate-pulse" /> Terminal Logs
-                </h2>
-                <div className="flex-1 overflow-y-auto font-mono text-[11px] text-[#30d158] space-y-1.5 flex flex-col-reverse">
-                  {logs.length === 0 ? <span className="text-white/30">System waiting for commands...</span> : logs.map((log, i) => <div key={i}>{log}</div>)}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB: DATABASE --- */}
-        {activeTab === 'database' && (
-          <div className="flex flex-col h-full space-y-4">
-            <h1 className="text-3xl font-black tracking-tight">Database Explorer</h1>
-            
-            <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl flex flex-col flex-1 min-h-[600px]">
-              {/* Filter Bar */}
-              <div className="p-4 border-b border-white/10 bg-white/5 flex flex-wrap gap-4 items-center rounded-t-2xl">
-                <div className="flex-1 min-w-[200px]">
-                  <input 
-                    type="text" 
-                    placeholder="Cari judul anime atau ID..." 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#0a84ff]"
-                  />
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#8e8e93] font-bold uppercase">Genre:</span>
-                  <select value={filterGenre} onChange={(e) => setFilterGenre(e.target.value)} className="bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-                    <option value="All">Semua Genre</option>
-                    {allGenres.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#8e8e93] font-bold uppercase">Eps:</span>
-                  <select value={filterEps} onChange={(e) => setFilterEps(e.target.value)} className="bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-                    <option value="All">Semua Anime</option>
-                    <option value="Zero">0 Episode (Kosong)</option>
-                    <option value="HasEps">Ada Episode</option>
-                  </select>
-                </div>
-                
-                <div className="text-xs text-[#8e8e93] font-bold px-2 bg-black py-1.5 rounded-lg border border-white/10">
-                  {filteredData.length} Hasil
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="flex-1 overflow-auto rounded-b-2xl">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead className="bg-black/90 text-[#8e8e93] sticky top-0 z-10 backdrop-blur-xl shadow-md">
-                    <tr>
-                      <th className="p-4 border-b border-white/10 font-bold uppercase text-[10px] tracking-widest">Cover</th>
-                      <th className="p-4 border-b border-white/10 font-bold uppercase text-[10px] tracking-widest w-[40%]">Judul & Meta</th>
-                      <th className="p-4 border-b border-white/10 font-bold uppercase text-[10px] tracking-widest">Status / Thn</th>
-                      <th className="p-4 border-b border-white/10 font-bold uppercase text-[10px] tracking-widest">Storage</th>
-                      <th className="p-4 border-b border-white/10 font-bold uppercase text-[10px] tracking-widest text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 bg-[#1c1c1e]">
-                    {filteredData.map((item) => (
-                      <tr key={item.anilistId} className="hover:bg-white/5 transition-colors group">
-                        <td className="p-4">
-                          <div className="w-12 h-16 rounded overflow-hidden bg-black border border-white/10 shadow-sm">
-                            {item.cover ? <img src={item.cover} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5" />}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="font-bold text-white mb-1.5 line-clamp-1" title={item.title}>{item.title}</div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="bg-black border border-white/10 px-2 py-0.5 rounded text-[10px] font-mono text-[#8e8e93]">ID: {item.anilistId}</span>
-                            {item.providerId && <span className="bg-[#0a84ff]/10 text-[#0a84ff] border border-[#0a84ff]/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold">{item.providerId}</span>}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {Array.isArray(item.genres) && item.genres.slice(0, 4).map(g => (
-                              <span key={g} className="text-[9px] text-[#8e8e93] bg-black border border-white/10 px-1.5 py-0.5 rounded">{g}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${item.status === 'RELEASING' ? 'bg-[#30d158]/20 text-[#30d158]' : 'bg-white/10 text-[#8e8e93]'}`}>
-                            {item.status}
-                          </span>
-                          <div className="text-xs text-[#8e8e93] font-bold mt-2.5 pl-1">{item.year}</div>
-                        </td>
-                        <td className="p-4 align-top pt-4">
-                          {item.episode_count > 0 ? (
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg font-black text-white">{item.episode_count}</span>
-                                <span className="text-[10px] text-[#8e8e93] uppercase font-bold tracking-wider">Eps DB</span>
-                              </div>
-                              {item.tg_count > 0 && (
-                                <div className="flex items-center gap-2 bg-[#0a84ff]/10 px-2 py-1 rounded-md border border-[#0a84ff]/20 w-fit">
-                                  <span className="text-sm font-black text-[#0a84ff]">{item.tg_count}</span>
-                                  <span className="text-[9px] text-[#0a84ff] uppercase font-bold tracking-wider">TG Proxy</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 bg-[#ff453a]/10 px-2 py-1.5 rounded-md border border-[#ff453a]/20 w-fit mt-1">
-                              <span className="text-sm font-black text-[#ff453a]">{item.episode_count}</span>
-                              <span className="text-[10px] text-[#ff453a] uppercase font-bold animate-pulse">Missing</span>
+                          {t.progress?.progress && (
+                            <div className="h-1.5 bg-black rounded-full overflow-hidden">
+                              <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${Math.min(100, Math.max(0, parseInt(t.progress.progress)))}%` }} />
                             </div>
                           )}
-                        </td>
-                        <td className="p-4 text-right align-top pt-5">
-                          <button 
-                            onClick={() => {
-                              setTargetId(String(item.anilistId));
-                              setActiveTab('dashboard');
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 bg-white text-black text-[10px] font-bold rounded-lg shadow-lg hover:scale-105"
-                          >
-                            Scrape Manual
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredData.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-12 text-center text-[#8e8e93] font-medium text-sm">Tidak ada anime yang cocok dengan filter.</td>
-                      </tr>
+                        </div>
+                      ))
                     )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB: CACHE --- */}
-        {activeTab === 'cache' && (
-          <div className="max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
-               <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                 <span className="text-[#ffcc00]">⚡</span> Stream Cache Engine
-               </h1>
-               <button onClick={fetchData} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-colors">
-                 Refresh Stats
-               </button>
-            </div>
-            
-            {!cacheStats ? (
-              <div className="p-8 text-center text-[#8e8e93] bg-[#1c1c1e] rounded-2xl border border-white/10">Memuat metrik cache...</div>
-            ) : (
-              <div className="space-y-6">
-                
-                {/* Latency & Hit Rate Simulation Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-[#1c1c1e] border border-[#ffcc00]/30 rounded-2xl p-5 relative overflow-hidden shadow-[inset_0_0_20px_rgba(255,204,0,0.05)]">
-                    <p className="text-[10px] uppercase font-bold text-[#ffcc00] tracking-widest mb-1 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#ffcc00] animate-pulse"></span> L0 (In-Memory LRU)
-                    </p>
-                    <p className="text-4xl font-black text-white mb-2">{cacheStats.l0_entries} <span className="text-xl text-[#8e8e93] font-medium">/ {cacheStats.l0_max}</span></p>
-                    <p className="text-xs text-[#8e8e93]">Latensi: <strong className="text-white">~0ms</strong> (Per-instance)</p>
-                  </div>
-                  
-                  <div className="bg-[#1c1c1e] border border-[#ff453a]/30 rounded-2xl p-5 relative overflow-hidden shadow-[inset_0_0_20px_rgba(255,69,58,0.05)]">
-                    <p className="text-[10px] uppercase font-bold text-[#ff453a] tracking-widest mb-1 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#ff453a]"></span> L1 (Upstash Redis)
-                    </p>
-                    <p className="text-4xl font-black text-white mb-2">Distributed</p>
-                    <p className="text-xs text-[#8e8e93]">Latensi: <strong className="text-white">~1-5ms</strong> (Global Edge)</p>
-                  </div>
-
-                  <div className="bg-[#1c1c1e] border border-[#0a84ff]/30 rounded-2xl p-5 relative overflow-hidden shadow-[inset_0_0_20px_rgba(10,132,255,0.05)]">
-                    <p className="text-[10px] uppercase font-bold text-[#0a84ff] tracking-widest mb-1 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#0a84ff]"></span> L2 (Neon Postgres)
-                    </p>
-                    <p className="text-4xl font-black text-white mb-2">{cacheStats.l2_pg_entries >= 0 ? cacheStats.l2_pg_entries : 'Error'}</p>
-                    <p className="text-xs text-[#8e8e93]">Latensi: <strong className="text-white">~10-30ms</strong> (Cold Store)</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Circuit Breakers */}
-                  <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-6">
-                    <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                      🔌 Circuit Breakers Status
-                    </h2>
-                    <div className="space-y-3">
+                <div className="bg-black rounded-[2rem] border border-white/5 p-6 h-80 flex flex-col">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500" /> Terminal Feed
+                  </h3>
+                  <div className="flex-1 overflow-y-auto font-mono text-[11px] text-green-400 leading-relaxed flex flex-col-reverse custom-scrollbar">
+                    {logs.length === 0 ? <span className="opacity-50">Awaiting telemetry...</span> : logs.map((log, i) => <div key={i} className="pb-1 opacity-80">{log}</div>)}
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* --- TAB: DATABASE --- */}
+          {activeTab === 'database' && (
+            <div className="space-y-6">
+              <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 p-4 flex flex-col md:flex-row gap-3">
+                <div className="flex-1 relative">
+                  <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input 
+                    type="text" 
+                    placeholder="Search Anime ID or Title..." 
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-black/50 border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 overflow-hidden">
+                <div className="max-h-[65vh] overflow-y-auto custom-scrollbar">
+                  <div className="divide-y divide-white/5">
+                    {paginatedData.length === 0 ? (
+                      <div className="p-10 text-center text-gray-500 text-sm">No records matched your criteria.</div>
+                    ) : (
+                      paginatedData.map((item) => (
+                        <div key={item.anilistId} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <img src={item.cover} alt="" className="w-12 h-16 rounded-xl object-cover bg-black shrink-0 border border-white/5 shadow-sm" loading="lazy" />
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-[15px] truncate pr-4 text-white">{item.title}</h3>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[11px] text-gray-400 font-mono">ID: {item.anilistId}</span>
+                                {item.providerId && <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.providerId}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 ml-4">
+                            {item.episode_count > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xl font-bold text-white leading-none">{item.episode_count}</span>
+                                <span className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Episodes</span>
+                                {item.tg_count > 0 && <span className="text-[9px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider mt-1">{item.tg_count} TG Proxy</span>}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] font-bold text-orange-400 bg-orange-500/10 px-3 py-1 rounded-lg uppercase tracking-wider">Empty</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="bg-black/30 border-t border-white/5 p-4 flex justify-between items-center">
+                    <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-5 py-2.5 bg-[#1C1C1E] border border-white/5 hover:bg-white/10 rounded-xl text-sm font-semibold disabled:opacity-30 transition-all">Previous</button>
+                    <span className="text-sm font-medium text-gray-400">{currentPage} of {totalPages}</span>
+                    <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-5 py-2.5 bg-[#1C1C1E] border border-white/5 hover:bg-white/10 rounded-xl text-sm font-semibold disabled:opacity-30 transition-all">Next</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- TAB: EDGE CACHE --- */}
+          {activeTab === 'cache' && (
+            <div className="space-y-6">
+              {!cacheStats ? (
+                <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 p-10 text-center text-gray-500">
+                  <p>Awaiting cache telemetry from Edge node...</p>
+                </div>
+              ) : cacheStats.error ? (
+                <div className="bg-red-500/10 rounded-[2rem] border border-red-500/20 p-10 text-center text-red-500">
+                  <p className="font-bold mb-1">Access Denied</p>
+                  <p className="text-sm">{cacheStats.error}. Please check your passcode and try logging in again.</p>
+                  <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-colors">
+                    Re-Authenticate
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <DataWidget title="L0 Instance LRU" value={`${cacheStats.l0_entries} / ${cacheStats.l0_max}`} caption="~0ms Latency" color="border-yellow-500/30" />
+                    <DataWidget title="L1 Global Edge Redis" value="Distributed" caption="~1-5ms Latency via Upstash" color="border-red-500/30" />
+                    <DataWidget title="L2 Serverless DB" value={cacheStats.l2_pg_entries ?? 'Err'} caption="~10-30ms Cold Store" color="border-blue-500/30" />
+                  </div>
+
+                  <div className="bg-gradient-to-br from-[#1C1C1E] to-black rounded-[2rem] border border-white/5 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight mb-2 text-white">Coalesced L3 Engine</h2>
+                      <p className="text-sm text-gray-400 max-w-md leading-relaxed">Active in-flight scraper tasks. Duplicate requests to the same episode concurrently are coalesced to prevent redundant scraping, utilizing Stale-While-Revalidate pattern.</p>
+                    </div>
+                    <div className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-purple-400 to-indigo-600">
+                      {cacheStats.inflight_scrapes}
+                    </div>
+                  </div>
+
+                  <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 p-6 md:p-8">
+                    <h2 className="text-lg font-semibold tracking-tight mb-6">Provider Circuit Breakers</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                       {Object.entries(cacheStats.circuit_breakers || {}).map(([provider, state]: [string, any]) => (
-                        <div key={provider} className="flex items-center justify-between bg-black border border-white/5 p-3 rounded-xl">
-                          <span className="font-mono text-sm capitalize text-[#8e8e93]">{provider}</span>
-                          <span className={`px-3 py-1 rounded-md text-[10px] font-black tracking-widest uppercase
-                            ${state === 'closed' ? 'bg-[#30d158]/20 text-[#30d158]' : 
-                              state === 'open' ? 'bg-[#ff453a]/20 text-[#ff453a] animate-pulse' : 
-                              'bg-[#ff9f0a]/20 text-[#ff9f0a]'}`}
-                          >
-                            {state}
+                        <div key={provider} className="bg-black/50 border border-white/5 p-4 rounded-2xl flex flex-col gap-2">
+                          <span className="font-semibold text-sm capitalize text-white">{provider}</span>
+                          <span className={`w-fit px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest
+                            ${state === 'closed' ? 'bg-green-500/10 text-green-500' : state === 'open' ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                            {state === 'closed' ? 'HEALTHY' : state === 'open' ? 'BLOCKED' : state}
                           </span>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Scrape Engine Activity */}
-                  <div className="bg-[#1c1c1e] border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
-                    <div>
-                      <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                        🕵️ Live Scrape (L3) Activity
-                      </h2>
-                      <div className="bg-black border border-white/5 p-5 rounded-xl text-center">
-                        <p className="text-6xl font-black text-[#bf5af2] mb-2">{cacheStats.inflight_scrapes}</p>
-                        <p className="text-xs text-[#8e8e93] font-bold uppercase tracking-wider">In-Flight Coalesced Scrapes</p>
-                      </div>
-                    </div>
-                    <div className="mt-6 text-xs text-[#8e8e93] bg-black p-4 rounded-xl border border-white/5 leading-relaxed">
-                      <strong className="text-white">💡 Engine Info:</strong> Request ganda ke episode yang sama akan di-coalesce. Scraper L3 hanya dipanggil ketika L0, L1, dan L2 MISS atau memasuki SWR window (Stale-While-Revalidate).
-                    </div>
-                  </div>
                 </div>
+              )}
+            </div>
+          )}
 
+          {/* --- TAB: ECOSYSTEM --- */}
+          {activeTab === 'ecosystem' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <DataWidget title="Web Pages" value="11" caption="Next.js App Router" color="border-white/10" />
+                <DataWidget title="Web Components" value="31" caption="React Server & Client" color="border-white/10" />
+                <DataWidget title="API Endpoints" value="15+" caption="FastAPI Routes" color="border-white/10" />
               </div>
-            )}
-          </div>
-        )}
 
+              <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 overflow-hidden">
+                <div className="p-6 border-b border-white/5">
+                  <h2 className="text-lg font-semibold tracking-tight">Full Production Stack</h2>
+                </div>
+                <div className="divide-y divide-white/5">
+                  <StackRow title="Frontend Web" desc="Next.js 15, TailwindCSS v4, React 19" />
+                  <StackRow title="Backend API" desc="FastAPI (Python 3.10), Uvicorn, SQLAlchemy" />
+                  <StackRow title="Database (L2)" desc="Neon Postgres (Serverless DB, connection pooler)" />
+                  <StackRow title="Global Cache (L1)" desc="Upstash Redis & QStash (for background cron)" />
+                  <StackRow title="Deployment" desc="Cloudflare Pages (Frontend) & Hugging Face Spaces (API)" />
+                  <StackRow title="Video Storage Proxy" desc="Telegram Swarm Proxy via Cloudflare Workers" />
+                  <StackRow title="Providers" desc="Oploverz, Samehadaku, Kuronime, Otakudesu" />
+                </div>
+              </div>
+
+              <div className="bg-[#1C1C1E] rounded-[2rem] border border-white/5 overflow-hidden">
+                <div className="p-6 border-b border-white/5">
+                  <h2 className="text-lg font-semibold tracking-tight">Database Schema Documentation</h2>
+                </div>
+                <div className="p-6 space-y-5 text-sm text-gray-300 leading-relaxed font-mono">
+                  <div><strong className="text-white">anime_metadata</strong> — Master record of AniList data, seasons, years, ratings, and localized titles.</div>
+                  <div><strong className="text-white">episodes</strong> — Granular structural table. 1 Row = 1 Episode per Provider. Stores the canonical URL of the episode on the provider's site.</div>
+                  <div><strong className="text-white">video_cache</strong> — Real-time M3U8/MP4 extracted sources. Heavily cached to prevent scraping the same episode twice. Follows strict TTL.</div>
+                  <div><strong className="text-white">watch_history</strong> — Cloud-synced user tracking. Stores precise timestamp drop-off points.</div>
+                  <div><strong className="text-white">user</strong> — BetterAuth-backed user profile with role-based access control and premium subscription status.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </main>
+
+      {/* Mobile Bottom Dock */}
+      <nav className="md:hidden fixed bottom-6 inset-x-6 z-50">
+         <div className="bg-[#1C1C1E]/80 backdrop-blur-3xl border border-white/10 rounded-3xl p-2 flex justify-between shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)]">
+           <DockItem active={activeTab === 'insights'} onClick={() => setActiveTab('insights')} icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" label="Insights" />
+           <DockItem active={activeTab === 'database'} onClick={() => setActiveTab('database')} icon="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" label="Database" />
+           <DockItem active={activeTab === 'cache'} onClick={() => setActiveTab('cache')} icon="M13 10V3L4 14h7v7l9-11h-7z" label="Edge" />
+           <DockItem active={activeTab === 'ecosystem'} onClick={() => setActiveTab('ecosystem')} icon="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" label="Stack" />
+         </div>
+      </nav>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+      `}</style>
+    </div>
+  );
+}
+
+function SidebarItem({ active, onClick, icon, label }: any) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${active ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+      <svg className={`w-5 h-5 ${active ? 'text-white' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active?2.5:2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+      </svg>
+      {label}
+    </button>
+  );
+}
+
+function DockItem({ active, onClick, icon, label }: any) {
+  return (
+    <button onClick={onClick} className={`flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all duration-200 ${active ? 'bg-white/15' : 'hover:bg-white/5'}`}>
+      <svg className={`w-6 h-6 mb-1 ${active ? 'text-white' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active?2.5:2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+      </svg>
+      <span className={`text-[9px] tracking-wide ${active ? 'text-white font-bold' : 'text-gray-400 font-medium'}`}>{label}</span>
+    </button>
+  );
+}
+
+function MetricBox({ label, value, color }: any) {
+  return (
+    <div className={`bg-[#1C1C1E] border border-white/5 rounded-[2rem] p-5 flex flex-col justify-end min-h-[120px]`}>
+      <div className={`text-4xl font-black tracking-tight mb-2 ${color}`}>{value}</div>
+      <div className="text-[11px] uppercase tracking-widest font-semibold text-gray-500">{label}</div>
+    </div>
+  );
+}
+
+function ListButton({ onClick, title, subtitle, icon, color, loading }: any) {
+  return (
+    <button onClick={onClick} disabled={loading} className="w-full flex items-center gap-4 bg-black/50 border border-white/5 hover:border-white/20 p-4 rounded-2xl transition-all disabled:opacity-50 active:scale-[0.98] text-left group">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg ${color}`}>
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-white truncate">{title}</h3>
+        <p className="text-[11px] text-gray-400 truncate mt-0.5">{subtitle}</p>
+      </div>
+      <svg className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
+}
+
+function DataWidget({ title, value, caption, color }: any) {
+  return (
+    <div className={`bg-[#1C1C1E] border-t-2 ${color} rounded-[2rem] p-6 border-x border-b border-white/5`}>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">{title}</h3>
+      <p className="text-3xl font-black text-white mb-2 tracking-tight">{value}</p>
+      <p className="text-sm text-gray-400">{caption}</p>
+    </div>
+  );
+}
+
+function StackRow({ title, desc }: any) {
+  return (
+    <div className="p-6 flex flex-col md:flex-row md:items-center gap-2 md:gap-6 hover:bg-white/5 transition-colors">
+      <h3 className="w-48 font-semibold text-white text-sm">{title}</h3>
+      <p className="flex-1 text-sm text-gray-400">{desc}</p>
     </div>
   );
 }
