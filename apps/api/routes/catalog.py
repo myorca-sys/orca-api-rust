@@ -29,7 +29,8 @@ GET  /api/v2/anime/{anilist_id}/episodes
 import asyncio
 import urllib.parse
 from typing import Optional, List, Dict
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Response, Header, Depends, Request
+import os
 
 from db.connection import database
 from services.pipeline import (
@@ -44,6 +45,14 @@ from services.db import upsert_anime_db
 from services.cache import swr_cache_get
 
 router = APIRouter()
+
+async def verify_admin_key(x_admin_key: str = Header(None)):
+    expected_key = os.getenv("ADMIN_API_KEY")
+    if not expected_key:
+        return
+    if not x_admin_key or x_admin_key != expected_key:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin Key")
+
 
 
 @router.get("/v2/debug/kuronime")
@@ -158,14 +167,14 @@ async def get_episodes_v2(anilist_id: int, background_tasks: BackgroundTasks, re
 
 # ── ADMIN ENDPOINTS ────────────────────────────────────────────────────────────
 
-@router.get("/v2/admin/stats")
+@router.get("/v2/admin/stats", dependencies=[Depends(verify_admin_key)])
 async def admin_get_stats():
     """Get ingestion and database stats for the admin dashboard"""
     from services.prefetch import get_ingestion_stats
     stats = await get_ingestion_stats()
     return {"success": True, **stats}
 
-@router.post("/v2/admin/trigger-prefetch")
+@router.post("/v2/admin/trigger-prefetch", dependencies=[Depends(verify_admin_key)])
 async def admin_trigger_prefetch():
     """Manually trigger the smart pre-fetch job instead of waiting for cron"""
     # Import here to avoid circular imports if any
@@ -177,7 +186,7 @@ async def admin_trigger_prefetch():
     
     return {"success": True, "message": "Smart Pre-fetch job started in the background."}
 
-@router.get("/v2/admin/database")
+@router.get("/v2/admin/database", dependencies=[Depends(verify_admin_key)])
 async def admin_get_database():
     """Return all anime in database with episode counts"""
     try:
@@ -197,7 +206,7 @@ async def admin_get_database():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@router.post("/v2/admin/mass-sync")
+@router.post("/v2/admin/mass-sync", dependencies=[Depends(verify_admin_key)])
 async def admin_mass_sync():
     """Trigger a mass sync via QStash or local background task"""
     import subprocess
@@ -210,7 +219,7 @@ async def admin_mass_sync():
     subprocess.Popen([sys.executable, script_path], env=env)
     return {"success": True, "message": "Mass sync process started in background."}
 
-@router.post("/v2/admin/sync-missing")
+@router.post("/v2/admin/sync-missing", dependencies=[Depends(verify_admin_key)])
 async def admin_sync_missing():
     """Find animes with 0 episodes and queue them for sync"""
     try:
@@ -257,7 +266,7 @@ async def debug_stream(anilist_id: int, title: str, ep: float):
         "kuronime": res_kur
     }
 
-@router.post("/v2/admin/fix-titles")
+@router.post("/v2/admin/fix-titles", dependencies=[Depends(verify_admin_key)])
 async def admin_fix_titles(background_tasks: BackgroundTasks):
     """Mass update nativeTitle to Romaji for all existing anime in the database"""
     async def _process_fix():
@@ -658,3 +667,50 @@ async def _fetch_and_save_anilist(anilist_id: int) -> Optional[dict]:
     except Exception as e:
         print(f"[Catalog] _fetch_and_save_anilist error for {anilist_id}: {e}")
         return None
+
+@router.get("/v2/admin/anime/{anilist_id}/episodes", dependencies=[Depends(verify_admin_key)])
+async def admin_get_anime_episodes(anilist_id: int):
+    try:
+        query = '''
+            SELECT id, "episodeNumber", "providerId", "episodeUrl" 
+            FROM episodes 
+            WHERE "anilistId" = :anilist_id
+            ORDER BY "episodeNumber" ASC, "providerId" ASC
+        '''
+        rows = await database.fetch_all(query, values={"anilist_id": anilist_id})
+        return {"success": True, "data": [dict(row) for row in rows]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.post("/v2/admin/episode/diagnose", dependencies=[Depends(verify_admin_key)])
+async def admin_diagnose_episode(request: Request):
+    data = await request.json()
+    url = data.get("url")
+    if not url:
+        return {"success": False, "error": "No URL provided"}
+        
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return {"success": True, "status": f"HTTP {resp.status_code}", "healthy": False}
+            
+            text = resp.text
+            if "#EXTM3U" not in text:
+                return {"success": True, "status": "Invalid M3U8", "healthy": False}
+                
+            duration = 0.0
+            for line in text.splitlines():
+                if line.startswith("#EXTINF:"):
+                    try:
+                        dur_str = line.split(":")[1].split(",")[0]
+                        duration += float(dur_str)
+                    except: pass
+                    
+            if duration < 300:
+                return {"success": True, "status": f"Corrupt ({duration:.1f}s)", "healthy": False, "duration": duration}
+            
+            return {"success": True, "status": "Healthy", "healthy": True, "duration": duration}
+    except Exception as e:
+        return {"success": True, "status": f"Unreachable", "healthy": False, "error": str(e)}
