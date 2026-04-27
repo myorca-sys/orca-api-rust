@@ -3,59 +3,64 @@ import React from "react";
 export function OrcaLogo({ className = "w-8 h-8", animated = true }: { className?: string; animated?: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className={className}>
-      {/* Ocean/Water base */}
-      <circle 
-        cx="50" cy="50" r="46" 
-        fill="currentColor" opacity="0.05" 
-        className={animated ? "animate-[pulse_3s_ease-in-out_infinite]" : ""} 
-      />
+      {animated && (
+        <style>
+          {`
+            @keyframes slashCut {
+              0% { stroke-dashoffset: 160; opacity: 0; }
+              10% { opacity: 1; }
+              25% { stroke-dashoffset: 0; opacity: 1; }
+              35% { stroke-dashoffset: -160; opacity: 0; }
+              100% { stroke-dashoffset: -160; opacity: 0; }
+            }
+            @keyframes revealOrca {
+              0%, 15% { opacity: 0; transform: scale(0.9) translate(-10px, 10px); filter: blur(4px); }
+              30%, 85% { opacity: 1; transform: scale(1) translate(0, 0); filter: blur(0px); }
+              95%, 100% { opacity: 0; transform: scale(1.05) translate(5px, -5px); filter: blur(2px); }
+            }
+            .slash-line {
+              stroke-dasharray: 160;
+              stroke-dashoffset: 160;
+              animation: slashCut 4s cubic-bezier(0.19, 1, 0.22, 1) infinite;
+            }
+            .orca-body {
+              animation: revealOrca 4s cubic-bezier(0.19, 1, 0.22, 1) infinite;
+              transform-origin: center;
+            }
+          `}
+        </style>
+      )}
       
-      {/* Animated Orca Silhouette leaping */}
-      <g className={animated ? "animate-[bounce_2.5s_ease-in-out_infinite]" : ""} style={{ transformOrigin: 'center' }}>
-        {/* Main Body (S-curve leaping motion) */}
+      <g className={animated ? "orca-body" : ""}>
+        {/* Premium Minimalist Orca Silhouette - Negative Space Style */}
         <path 
+          d="M 85 45 
+             C 80 30 65 20 45 25 
+             C 25 30 10 40 5 50 
+             C 10 60 25 75 50 75 
+             C 70 75 80 65 85 45 Z" 
           fill="currentColor" 
-          d="M 85 45 C 80 30 65 20 45 25 C 25 30 15 45 10 55 C 15 65 30 75 55 70 C 75 65 85 55 85 45 Z" 
         />
-        
         {/* Dorsal Fin */}
-        <path 
-          fill="currentColor" 
-          d="M 45 25 C 45 10 52 5 55 5 C 52 15 54 20 50 25 Z" 
-        />
-        
+        <path d="M 45 25 C 45 5 55 0 60 0 C 55 10 60 20 55 28 Z" fill="currentColor" />
         {/* Pectoral Fin */}
-        <path 
-          fill="currentColor" 
-          d="M 40 68 C 35 80 25 85 20 80 C 25 75 30 70 35 68 Z" 
-        />
+        <path d="M 40 68 C 30 85 20 90 15 85 C 20 80 25 75 35 65 Z" fill="currentColor" />
         
-        {/* Tail Fin */}
-        <path 
-          fill="currentColor" 
-          d="M 10 55 C 5 50 0 45 5 40 C 5 48 10 52 15 52 Z" 
-        />
+        {/* Distinctive Eye Patch (Cut out effect using background color) */}
+        <path d="M 60 38 C 65 35 75 38 75 42 C 75 46 65 44 60 42 Z" fill="#000000" />
         
-        {/* Eye Patch (White oval) */}
-        <ellipse 
-          cx="68" cy="40" rx="7" ry="3.5" 
-          fill="#ffffff" 
-          transform="rotate(-15 68 40)" 
-        />
-        
-        {/* Underbelly Patch (White) */}
-        <path 
-          fill="#ffffff" opacity="0.9"
-          d="M 25 58 C 35 68 55 68 65 62 C 55 65 40 62 30 55 Z" 
-        />
+        {/* Belly Accent (Cut out effect) */}
+        <path d="M 25 58 C 35 68 55 68 65 62 C 55 65 40 62 30 55 Z" fill="#000000" opacity="0.9" />
       </g>
-
-      {/* Yin-Yang / Dynamic Accent Dot */}
-      <circle 
-        cx="75" cy="35" r="3" 
-        fill="#0A84FF" 
-        className={animated ? "animate-pulse" : ""} 
-      />
+      
+      {/* High-speed Anime Slash Effect */}
+      {animated && (
+        <line 
+          x1="5" y1="95" x2="95" y2="5" 
+          stroke="#0A84FF" strokeWidth="5" strokeLinecap="round" 
+          className="slash-line" 
+        />
+      )}
     </svg>
   );
 }

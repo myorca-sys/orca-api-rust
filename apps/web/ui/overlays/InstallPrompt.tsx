@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useA2HS } from "@/core/hooks/use-a2hs";
 import { X, Share, PlusSquare } from "lucide-react";
+import { OrcaLogo } from "@/ui/icons/OrcaLogo";
 import clsx from "clsx";
 
 export function InstallPrompt() {
@@ -50,7 +51,7 @@ export function InstallPrompt() {
 
         <div className="flex gap-4 items-start pr-6">
           <div className="flex-shrink-0 w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center border border-white/5">
-            <span className="text-white font-bold text-xl">O</span>
+            <OrcaLogo className="w-8 h-8 text-white" animated={false} />
           </div>
           
           <div className="flex flex-col gap-1">
