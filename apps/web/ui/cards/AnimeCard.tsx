@@ -7,9 +7,7 @@
 import { memo, useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { API } from "@/core/lib/api";
 import { IconPlay, IconCheck } from "@/ui/icons";
-import { useSettings } from "@/core/stores/app-store";
 import { useWatchHistory } from "@/core/hooks/use-watch-history";
 
 interface Props {
@@ -22,7 +20,8 @@ interface Props {
   epId?: string;
   rank?: number;
   variant?: "vertical" | "horizontal";
-  isNew?: boolean;
+  isNew?: boolean; // Deprecated in favor of badge
+  badge?: "NEW" | "BEST" | "MOVIE";
   totalEps?: number | null;
   views?: number | null;
 }
@@ -33,7 +32,7 @@ function formatViews(v: number): string {
   return v.toString();
 }
 
-function AnimeCardInner({ id, title, img, banner, score, color, epId, rank, variant = "vertical", isNew, totalEps, views }: Props) {
+function AnimeCardInner({ id, title, img, banner, score, color, epId, rank, variant = "vertical", isNew, badge, totalEps, views }: Props) {
   const accent = "#0A84FF";
   const { history } = useWatchHistory();
   const ref = useRef<HTMLDivElement>(null);
@@ -62,6 +61,8 @@ function AnimeCardInner({ id, title, img, banner, score, color, epId, rank, vari
 
   const aspectClass = variant === "horizontal" ? "aspect-video" : "aspect-[2/3]";
   const imageSrc = variant === "horizontal" ? (banner || img) : img;
+  
+  const currentBadge = badge || (isNew ? "NEW" : null);
 
   return (
     <div ref={ref} onMouseEnter={handleMouseEnter} onTouchStart={handleMouseEnter} className="flex flex-col h-full w-full group cursor-pointer anim-up" style={{ animationDelay: rank ? `${Math.min(rank * 40, 240)}ms` : "0ms" }}>
@@ -81,15 +82,22 @@ function AnimeCardInner({ id, title, img, banner, score, color, epId, rank, vari
           <div className="absolute top-0 left-0 w-7 h-9 bg-black/60 rounded-br-xl flex items-center justify-center font-black text-sm text-white z-10">{rank}</div>
         )}
 
-        {!rank && isNew && (
+        {!rank && currentBadge === "NEW" && (
           <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-gradient-to-r from-[#FFCC00] to-[#FF9500] text-black text-[9px] font-black uppercase tracking-wider rounded shadow-md z-10">NEW</span>
         )}
-
-        {epId && (
-          <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-[#FF453A]/90 text-[9px] font-bold uppercase tracking-wider rounded z-10">
-            {totalEps ? `EPS ${epId}/${totalEps}` : `EPS ${epId}`}
-          </span>
+        {!rank && currentBadge === "BEST" && (
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-gradient-to-r from-[#32D74B] to-[#30D158] text-black text-[9px] font-black uppercase tracking-wider rounded shadow-md z-10">BEST</span>
         )}
+        {!rank && currentBadge === "MOVIE" && (
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-gradient-to-r from-[#BF5AF2] to-[#AF52DE] text-white text-[9px] font-black uppercase tracking-wider rounded shadow-md z-10">MOVIE</span>
+        )}
+
+        {/* Dynamic Episode display based on badge */}
+        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-[#FF453A]/90 text-[9px] font-bold uppercase tracking-wider rounded z-10 shadow-md">
+          {currentBadge === "MOVIE" ? "HD" : 
+           currentBadge === "BEST" ? `${totalEps || epId || '?'} EPS` :
+           `EPS ${epId || totalEps || '?'}`}
+        </span>
 
         <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center justify-between opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0 transition-all duration-200">
           <span className="text-white/80 text-[10px] font-medium">{epId ? "Tonton" : "Detail"}</span>

@@ -6,10 +6,11 @@ import { AnimeCard } from "./AnimeCard";
 interface Props {
   title: string;
   items: any[];
-  isNew?: boolean;
+  isNew?: boolean; // Deprecated
+  badge?: "NEW" | "BEST" | "MOVIE";
 }
 
-export function LatestGrid({ title, items, isNew = false }: Props) {
+export function LatestGrid({ title, items, isNew = false, badge }: Props) {
   const [visibleCount, setVisibleCount] = useState(12);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -36,11 +37,13 @@ export function LatestGrid({ title, items, isNew = false }: Props) {
                 img={a.img || a.coverImage?.extraLarge || a.coverImage?.large || null}
                 banner={a.banner || a.bannerImage || null}
                 score={a.score || a.averageScore}
-                views={a.views}                color={a.color || a.coverImage?.color}
+                views={a.views}
+                color={a.color || a.coverImage?.color}
                 epId={a.latestEpisode ? String(a.latestEpisode) : (a.episodes ? String(a.episodes) : undefined)}
                 totalEps={a.episodes}
                 variant="vertical"
                 isNew={isNew}
+                badge={badge}
               />
             </div>
           );

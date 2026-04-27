@@ -7,19 +7,24 @@ import { api } from "@/core/lib/api";
 import { AnimeCard } from "@/ui/cards/AnimeCard";
 import { IconSearch, IconClose, IconClock } from "@/ui/icons";
 
+// Full list of genres for retention
 const GENRES = [
-  { name: "Action", gradient: "from-[#FF3B30] to-[#FF2D55]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/nx21-6895.jpg" },
-  { name: "Romance", gradient: "from-[#FF2D55] to-[#FF375F]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx124080-mFmDofO0KkE3.jpg" },
-  { name: "Fantasy", gradient: "from-[#5856D6] to-[#AF52DE]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-p2v7VSt9Xp4G.jpg" },
-  { name: "Sci-Fi", gradient: "from-[#007AFF] to-[#5AC8FA]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-739Z7ot7i1uC.jpg" },
-  { name: "Comedy", gradient: "from-[#FFCC00] to-[#FFD60A]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx114129-9vH0X9667C26.jpg" },
-  { name: "Drama", gradient: "from-[#FF9500] to-[#FFAC33]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101759-S9uV53YOfm96.jpg" },
-  { name: "Horror", gradient: "from-[#1C1C1E] to-[#2C2C2E]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101922-W9SeY9v9vVv9.jpg" },
-  { name: "Sports", gradient: "from-[#34C759] to-[#30D158]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx20992-9vH0X9667C26.jpg" },
-  { name: "Mecha", gradient: "from-[#64D2FF] to-[#5AC8FA]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21051-9vH0X9667C26.jpg" },
-  { name: "Slice of Life", gradient: "from-[#FF9500] to-[#FFD60A]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx100166-mFmDofO0KkE3.jpg" },
-  { name: "Mystery", gradient: "from-[#AF52DE] to-[#BF5AF2]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx11061-9vH0X9667C26.jpg" },
-  { name: "Psychological", gradient: "from-[#5E5CE6] to-[#66d2ff]", image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21519-9vH0X9667C26.jpg" },
+  { name: "Action", bg: "bg-[#FF3B30]/10", border: "border-[#FF3B30]/20", text: "text-[#FF3B30]" },
+  { name: "Romance", bg: "bg-[#FF2D55]/10", border: "border-[#FF2D55]/20", text: "text-[#FF2D55]" },
+  { name: "Fantasy", bg: "bg-[#5856D6]/10", border: "border-[#5856D6]/20", text: "text-[#5856D6]" },
+  { name: "Sci-Fi", bg: "bg-[#007AFF]/10", border: "border-[#007AFF]/20", text: "text-[#007AFF]" },
+  { name: "Comedy", bg: "bg-[#FFCC00]/10", border: "border-[#FFCC00]/20", text: "text-[#FFCC00]" },
+  { name: "Drama", bg: "bg-[#FF9500]/10", border: "border-[#FF9500]/20", text: "text-[#FF9500]" },
+  { name: "Horror", bg: "bg-[#FF453A]/10", border: "border-[#FF453A]/20", text: "text-[#FF453A]" },
+  { name: "Sports", bg: "bg-[#34C759]/10", border: "border-[#34C759]/20", text: "text-[#34C759]" },
+  { name: "Mecha", bg: "bg-[#64D2FF]/10", border: "border-[#64D2FF]/20", text: "text-[#64D2FF]" },
+  { name: "Slice of Life", bg: "bg-[#AF52DE]/10", border: "border-[#AF52DE]/20", text: "text-[#AF52DE]" },
+  { name: "Mystery", bg: "bg-[#5E5CE6]/10", border: "border-[#5E5CE6]/20", text: "text-[#5E5CE6]" },
+  { name: "Psychological", bg: "bg-[#FF375F]/10", border: "border-[#FF375F]/20", text: "text-[#FF375F]" },
+  { name: "Adventure", bg: "bg-[#30D158]/10", border: "border-[#30D158]/20", text: "text-[#30D158]" },
+  { name: "Supernatural", bg: "bg-[#BF5AF2]/10", border: "border-[#BF5AF2]/20", text: "text-[#BF5AF2]" },
+  { name: "Thriller", bg: "bg-[#1C1C1E]", border: "border-white/20", text: "text-white" },
+  { name: "Music", bg: "bg-[#FFD60A]/10", border: "border-[#FFD60A]/20", text: "text-[#FFD60A]" },
 ];
 
 function useDebounce(val: string, ms: number) {
@@ -108,11 +113,16 @@ function ExploreViewInner({ initialResults = [] }: { initialResults?: any[] }) {
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40"><IconSearch className="w-5 h-5" /></div>
           <input 
             ref={inputRef}
-            autoFocus
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
             value={query} 
             onChange={(e) => setQuery(e.target.value)} 
             className="w-full bg-[#1c1c1e] text-white rounded-[16px] py-3.5 pl-12 pr-10 outline-none text-[16px] placeholder-white/30 border border-white/10 focus:border-white/20 transition-all shadow-lg" 
-            placeholder="Anime, genre, atau studio..." 
+            placeholder="Ketik judul anime..." 
           />
           {(query || genre) && (
             <button 
@@ -153,7 +163,7 @@ function ExploreViewInner({ initialResults = [] }: { initialResults?: any[] }) {
         ) : (
           <div className="anim-up max-w-5xl mx-auto space-y-10">
             {searchHist.length > 0 && (
-              <div className="px-5 md:px-0">
+              <div className="px-1 md:px-0">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-bold text-white">Terakhir dicari</h2>
                   <button onClick={() => { saveSearchHist([]); setSearchHist([]); }} className="text-[#0A84FF] text-[13px] font-medium active:opacity-50 transition-opacity">Hapus Semua</button>
@@ -167,6 +177,25 @@ function ExploreViewInner({ initialResults = [] }: { initialResults?: any[] }) {
                 </div>
               </div>
             )}
+            
+            {/* Genre Grid for Retention */}
+            <div className="px-1 md:px-0">
+              <h2 className="text-lg font-bold text-white mb-4">Eksplorasi Genre</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {GENRES.map(g => (
+                  <button 
+                    key={g.name}
+                    onClick={() => setGenre(g.name)}
+                    className={`relative w-full py-4 px-4 rounded-2xl flex items-center justify-between overflow-hidden border ${g.border} ${g.bg} active:scale-95 transition-all group`}
+                  >
+                    <span className={`font-black text-sm relative z-10 ${g.text}`}>{g.name}</span>
+                    <div className={`w-8 h-8 rounded-full bg-black/20 flex items-center justify-center relative z-10`}>
+                      <span className={`text-[10px] font-bold ${g.text}`}>→</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

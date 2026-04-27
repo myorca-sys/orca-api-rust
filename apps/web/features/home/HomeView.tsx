@@ -109,7 +109,7 @@ export default function HomeView({
 
       {/* Section 1: Ongoing (Render immediately as it's above the fold) */}
       {ongoingItems.length > 0 && (
-        <LatestGrid title="Sedang Tayang & Terbaru" items={ongoingItems} isNew={true} />
+        <LatestGrid title="Sedang Tayang & Terbaru" items={ongoingItems} badge="NEW" />
       )}
 
       {/* Lazy Sections for heavy components below the fold */}
@@ -117,14 +117,14 @@ export default function HomeView({
         {/* Section 2: Best Completed */}
         {bestItems.length > 0 && (
           <LazySection>
-            <LatestGrid title="Anime Tamat Terbaik" items={bestItems} />
+            <LatestGrid title="Anime Tamat Terbaik" items={bestItems} badge="BEST" />
           </LazySection>
         )}
         
         {/* Section 3: Movies */}
         {initialMovies.length > 0 && (
           <LazySection>
-            <LatestGrid title="Film Anime (Movies)" items={initialMovies} />
+            <LatestGrid title="Film Anime (Movies)" items={initialMovies} badge="MOVIE" />
           </LazySection>
         )}
       </div>
