@@ -172,9 +172,10 @@ async def _single_stream_download(url: str, output_path: str) -> bool:
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        _, stderr = await asyncio.wait_for(process.communicate(), timeout=45.0)
+        # Give it up to 10 minutes to download a full episode, but rw_timeout will kill it if it stalls for 15s
+        _, stderr = await asyncio.wait_for(process.communicate(), timeout=600.0)
     except asyncio.TimeoutError:
-        logger.error("[Fetcher] FFmpeg timeout after 45s, killing process...")
+        logger.error("[Fetcher] FFmpeg timeout after 600s, killing process...")
         try:
             process.kill()
         except:

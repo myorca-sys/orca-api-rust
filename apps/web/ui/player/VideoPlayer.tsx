@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, useCallback, memo, isValidElement, cloneElement } from "react";
 import { IconPlay, IconPause, IconFullscreen, IconVolume, IconSettings } from "@/ui/icons";
+import { OrcaLogo } from "@/ui/icons/OrcaLogo";
 import { useSettings } from "@/core/stores/app-store";
 import { useWatchHistory } from "@/core/hooks/use-watch-history";
 import { useVideoGestures } from "@/core/hooks/use-video-gestures";
@@ -217,9 +218,15 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    let lastTimeUpdate = 0;
     const onTime = () => {
       progressRef.current = v.currentTime;
-      if (!isDragging.current) setProgress(v.currentTime);
+      const now = Date.now();
+      // Throttle state update to ~250ms to prevent CPU thrashing
+      if (!isDragging.current && now - lastTimeUpdate > 250) {
+        setProgress(v.currentTime);
+        lastTimeUpdate = now;
+      }
       if (onTimeUpdate) onTimeUpdate(v.currentTime);
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
       const dur = v.duration;
@@ -303,16 +310,18 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
     if (!anilistId || !episodeNum) return;
     clearInterval(saveTimer.current);
     saveTimer.current = setInterval(() => {
-      if (progress < 2 || duration < 2) return;
+      const currentProgress = progressRef.current;
+      const currentDuration = durationRef.current;
+      if (currentProgress < 2 || currentDuration < 2) return;
       updateProgress({ 
         anilistId,
         animeSlug: animeSlug || String(anilistId), 
         animeTitle: title.split(" - ")[0] ?? title, 
         episode: episodeNum, 
         episodeTitle: title, 
-        timestampSec: Math.floor(progress), 
-        durationSec: Math.floor(duration), 
-        completed: duration > 0 && progress / duration > 0.9 
+        timestampSec: Math.floor(currentProgress), 
+        durationSec: Math.floor(currentDuration), 
+        completed: currentDuration > 0 && currentProgress / currentDuration > 0.9 
       });
       
       if (userId) {
@@ -324,8 +333,8 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
               user_id: userId,
               anilist_id: anilistId,
               episode_number: episodeNum,
-              watch_duration_sec: Math.floor(progress),
-              total_duration_sec: Math.floor(duration),
+              watch_duration_sec: Math.floor(currentProgress),
+              total_duration_sec: Math.floor(currentDuration),
               quality_watched: current?.quality || "Auto",
               provider_used: current?.provider || "unknown"
             })
@@ -334,7 +343,7 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
       }
     }, 15_000);
     return () => clearInterval(saveTimer.current);
-  }, [progress, duration, anilistId, animeSlug, episodeNum, title, updateProgress, userId, current]);
+  }, [anilistId, animeSlug, episodeNum, title, updateProgress, userId, current]);
 
   const togglePlay = useCallback((e?: React.MouseEvent | React.TouchEvent) => { 
     if (e) e.stopPropagation();
@@ -429,12 +438,7 @@ function VideoPlayerInner({ anilistId, title, poster, sources, animeSlug, episod
       <div className="relative flex flex-col items-center justify-center gap-4 animate-pulse">
         <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_15px_rgba(10,132,255,0.5)]">
            <div className="absolute inset-0 bg-[#0a84ff] opacity-20 blur-2xl rounded-full" />
-           <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 100 100" className="relative z-10">
-             <circle cx="50" cy="50" r="46" fill="currentColor" opacity="0.1" />
-             <path fill="currentColor" d="M50 4 C 20 4 4 22 4 50 C 4 78 20 96 50 96 C 65 96 50 74 50 50 C 50 26 65 4 50 4 Z" />
-             <path fill="currentColor" d="M 22 32 Q 2 10 12 2 Q 28 16 33 46 Z" />
-             <circle cx="28" cy="26" r="4.5" fill="#000000" />
-           </svg>
+           <OrcaLogo className="relative z-10 w-14 h-14" animated={true} />
         </div>
         <span className="text-xl font-black text-white tracking-tight drop-shadow-[0_0_15px_rgba(10,132,255,0.5)]">Orca<span className="text-[#0A84FF]">.</span></span>
       </div>

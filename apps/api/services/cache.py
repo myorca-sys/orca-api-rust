@@ -27,12 +27,15 @@ async def upstash_keys(pattern: str):
 async def upstash_set(key: str, value: dict, ex: int = 3600, nx: bool = False):
     try:
         payload = json.dumps(value)
-        url = f"{UPSTASH_REDIS_REST_URL}/set/{key}?EX={ex}"
+        command = ["SET", key, payload, "EX", str(ex)]
         if nx:
-            url += "&NX"
-        res = await client.post(url, headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}, data=payload)
-        # Upstash returns 'OK' for normal SET, and for NX it returns 'OK' if set, or null if not set.
-        result = res.json().get('result')
+            command.append("NX")
+        res = await client.post(UPSTASH_REDIS_REST_URL, headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}, json=command)
+        data = res.json()
+        if "error" in data:
+            print(f"[Upstash] Set error response: {data['error']}")
+            return False
+        result = data.get('result')
         return result == 'OK'
     except Exception as e:
         print(f"[Upstash] Set error: {e}")

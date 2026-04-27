@@ -1,7 +1,6 @@
-"use client";
-
 import { useState, useEffect, useMemo } from "react";
-import { API } from "@/core/lib/api";
+
+const API = "https://jonyyyyyyyu-anime-scraper-api.hf.space";
 
 interface AnimeRow {
   anilistId: number;
@@ -15,10 +14,10 @@ interface AnimeRow {
   providerId: string | null;
 }
 
-export default function AdminDashboard() {
+export default function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, database, cache
+  const [activeTab, setActiveTab] = useState("dashboard");
   
   const [targetId, setTargetId] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -38,7 +37,6 @@ export default function AdminDashboard() {
     }
   }, []);
   
-  // Database explorer states
   const [dbData, setDbData] = useState<AnimeRow[]>([]);
   const [filterGenre, setFilterGenre] = useState<string>("All");
   const [filterEps, setFilterEps] = useState<string>("All");
@@ -64,8 +62,7 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     const key = localStorage.getItem("adminKey") || password;
     try {
-      // 1. Fetch quick stats
-      const resStats = await fetch(`${API}/api/v2/admin/stats`, { cache: 'no-store' });
+      const resStats = await fetch(`${API}/api/v2/admin/stats`);
       if (resStats.ok) {
         const dataStats = await resStats.json();
         if (dataStats.success) {
@@ -77,27 +74,22 @@ export default function AdminDashboard() {
         }
       }
 
-      // 2. Fetch full database
-      const resDb = await fetch(`${API}/api/v2/admin/database`, { cache: 'no-store' });
+      const resDb = await fetch(`${API}/api/v2/admin/database`);
       if (resDb.ok) {
         const dataDb = await resDb.json();
         if (dataDb.success) setDbData(dataDb.data);
       }
       
-      // 3. Fetch Stream Cache Stats
       const resCache = await fetch(`${API}/api/v2/admin/cache-stats`, { 
-        headers: { 'x-admin-key': key },
-        cache: 'no-store'
+        headers: { 'x-admin-key': key }
       });
       if (resCache.ok) {
         const dataCache = await resCache.json();
         setCacheStats(dataCache);
       }
 
-      // 4. Fetch Active Ingestion Tasks
       const resTasks = await fetch(`${API}/api/v2/admin/ingest-stats`, { 
-        headers: { 'x-admin-key': key },
-        cache: 'no-store'
+        headers: { 'x-admin-key': key }
       });
       if (resTasks.ok) {
         const dataTasks = await resTasks.json();
@@ -211,7 +203,6 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  // Derived Data for Filters
   const allGenres = useMemo(() => {
     const genres = new Set<string>();
     dbData.forEach(item => {

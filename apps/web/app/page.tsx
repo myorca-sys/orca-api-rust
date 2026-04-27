@@ -1,9 +1,8 @@
 import HomeView from "@/features/home/HomeView";
 import { api } from "@/core/lib/api";
 
-export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
-export const revalidate = 0;
+export const revalidate = 3600;
 
 export default async function Page() {
   let hero = [];

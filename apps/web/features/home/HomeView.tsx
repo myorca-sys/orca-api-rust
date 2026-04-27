@@ -9,6 +9,7 @@ import { AnimeRow } from "@/ui/cards/AnimeRow";
 import { SpecialPopularRow } from "@/ui/cards/SpecialPopularRow";
 import { LatestGrid } from "@/ui/cards/LatestGrid";
 import { authClient } from "@/core/lib/auth-client";
+import { OrcaLogo } from "@/ui/icons/OrcaLogo";
 
 const greet = () => {
   const h = new Date().getHours();
@@ -44,19 +45,10 @@ export default function HomeView({
 
   return (
     <div className="w-full pb-24 bg-black min-h-screen text-white selection:bg-[#0A84FF]/30">
-      {/* Static Orca Logo */}
+      {/* Dynamic Orca Logo */}
       <div className="px-6 md:px-10 pt-8 pb-2">
         <h1 className="text-[28px] font-black text-white tracking-tight flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 100 100">
-            {/* Base circle background representing the ocean / yin yang base */}
-            <circle cx="50" cy="50" r="46" fill="currentColor" opacity="0.1" />
-            {/* The main Orca body curving like the Yin S-curve */}
-            <path fill="currentColor" d="M50 4 C 20 4 4 22 4 50 C 4 78 20 96 50 96 C 65 96 50 74 50 50 C 50 26 65 4 50 4 Z" />
-            {/* The sharp protruding dorsal fin breaking out of the circle */}
-            <path fill="currentColor" d="M 22 32 Q 2 10 12 2 Q 28 16 33 46 Z" />
-            {/* The eye of the orca serving as the Yin-Yang dot */}
-            <circle cx="28" cy="26" r="4.5" fill="#000000" />
-          </svg>
+          <OrcaLogo className="w-8 h-8 text-white" animated={true} />
           Orca<span className="text-[#0A84FF]">.</span>
         </h1>
       </div>
