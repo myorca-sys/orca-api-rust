@@ -1,0 +1,31 @@
+name: Scraper Ingestion Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Anime/Manga title to search and ingest'
+        required: true
+        default: 'Nippon Sangoku'
+
+jobs:
+  scrape-and-ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          npm install postgres
+
+      - name: Run Scraper Test
+        env:
+          TARGET_QUERY: ${{ github.event.inputs.query || 'Nippon Sangoku' }}
+        run: |
+          node scripts/gh_ingestion_test.mjs
