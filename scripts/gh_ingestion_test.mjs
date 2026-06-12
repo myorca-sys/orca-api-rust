@@ -1,42 +1,37 @@
-const query = process.env.TARGET_QUERY || "Nippon Sangoku";
+const query = process.env.TARGET_QUERY || "Classroom of the Elite";
 
-async function testProvider(name, baseUrl, isKuronime = false) {
-  console.log(`\n--- Testing ${name} for '${query}' ---`);
-  const url = `${baseUrl}?s=${encodeURIComponent(query)}`;
+async function testProviderHF(providerName) {
+  console.log(`\n--- Testing ${providerName.toUpperCase()} via HF Space for '${query}' ---`);
+  const url = `https://orcanime-orcanime-api-rust.hf.space/api/v1/anime/search/${encodeURIComponent(query)}?provider=${providerName.toLowerCase()}`;
   
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Referer': baseUrl,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
+    const res = await fetch(url);
+    const json = await res.json();
+    
+    console.log(`[${providerName}] HF HTTP Status: ${res.status}`);
+    
+    if (json.success) {
+      console.log(`✅ [${providerName}] SUCCESS! Found ${json.results.length} results.`);
+      for (let i = 0; i < Math.min(3, json.results.length); i++) {
+        console.log(`   - ${json.results[i].title}`);
+        console.log(`     URL: ${json.results[i].url}`);
       }
-    });
-    
-    console.log(`[${name}] HTTP Status: ${res.status}`);
-    const html = await res.text();
-    
-    if (html.includes("Just a moment...") || html.includes("challenges.cloudflare.com")) {
-      console.log(`❌ [${name}] BLOCKED BY CLOUDFLARE (Challenge detected)`);
-      console.log(`   Length: ${html.length} bytes`);
     } else {
-      console.log(`✅ [${name}] CLOUDFLARE PASSED`);
-      if (html.toLowerCase().includes(query.toLowerCase())) {
-        console.log(`🔍 [${name}] Keyword found in HTML.`);
-      } else {
-         console.log(`⚠️ [${name}] Content loaded, but keyword not found.`);
-      }
+      console.log(`❌ [${providerName}] API ERROR: ${json.error}`);
     }
   } catch (err) {
-    console.error(`❌ [${name}] Request Error: ${err.message}`);
+    console.error(`❌ [${providerName}] Request Error: ${err.message}`);
   }
 }
 
 async function main() {
-  console.log(`Starting GitHub Actions Scraper Test from Datacenter IP...`);
-  await testProvider("Samehadaku", "https://v2.samehadaku.how/");
-  await testProvider("Kuronime", "https://kuronime.sbs/", true);
+  console.log(`Starting GitHub Actions Pipeline Test...`);
+  console.log(`Target: Hugging Face API`);
+  console.log(`Query: ${query}`);
+  
+  await testProviderHF("Samehadaku");
+  await testProviderHF("Kuronime");
+  
   console.log("\n--- TEST COMPLETED ---");
 }
 
