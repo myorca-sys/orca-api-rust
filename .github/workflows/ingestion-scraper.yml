@@ -7,19 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       query:
-        description:
-  push:
-    branches:
-      - main 'Anime/Manga title to search and ingest'
+        description: 'Anime/Manga title to search and ingest'
         required: true
         default: 'Nippon Sangoku'
 
 jobs:
   scrape-and-ingest:
-    runs-on:
-  push:
-    branches:
-      - main ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,10 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version:
-  push:
-    branches:
-      - main '20'
+          node-version: '20'
 
       - name: Install Dependencies
         run: |
