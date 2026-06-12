@@ -1,16 +1,25 @@
 name: Scraper Ingestion Pipeline
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       query:
-        description: 'Anime/Manga title to search and ingest'
+        description:
+  push:
+    branches:
+      - main 'Anime/Manga title to search and ingest'
         required: true
         default: 'Nippon Sangoku'
 
 jobs:
   scrape-and-ingest:
-    runs-on: ubuntu-latest
+    runs-on:
+  push:
+    branches:
+      - main ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,7 +27,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version:
+  push:
+    branches:
+      - main '20'
 
       - name: Install Dependencies
         run: |
