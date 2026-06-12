@@ -1,4 +1,4 @@
-const query = process.env.TARGET_QUERY || "Classroom of the Elite";
+const query = "cote s4";
 
 async function testProviderHF(providerName) {
   console.log(`\n--- Testing ${providerName.toUpperCase()} via HF Space for '${query}' ---`);
