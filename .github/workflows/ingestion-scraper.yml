@@ -1,9 +1,6 @@
 name: Scraper Ingestion Pipeline
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       query:
@@ -27,8 +24,9 @@ jobs:
         run: |
           npm install postgres
 
-      - name: Run Scraper Test
+      - name: Run Production Ingestion
         env:
-          TARGET_QUERY: ${{ github.event.inputs.query || 'Nippon Sangoku' }}
+          TARGET_QUERY: "Classroom of the Elite Season 4"
+          DATABASE_URL: "postgresql://postgres.ppwocgmumbdbvnqprxrg:Habibiendut1.@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
         run: |
-          node scripts/gh_ingestion_test.mjs
+          node scripts/gh_production_sync.mjs
