@@ -26,7 +26,7 @@ jobs:
 
       - name: Run Production Ingestion
         env:
-          TARGET_QUERY: "Classroom of the Elite Season 4"
+          TARGET_QUERY: "Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e"
           DATABASE_URL: "postgresql://postgres.ppwocgmumbdbvnqprxrg:Habibiendut1.@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
         run: |
           node scripts/gh_production_sync.mjs
