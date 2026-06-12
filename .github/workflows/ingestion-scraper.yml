@@ -1,12 +1,15 @@
 name: Scraper Ingestion Pipeline
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       query:
         description: 'Anime/Manga title to search and ingest'
         required: true
-        default: 'Nippon Sangoku'
+        default: 'Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e'
 
 jobs:
   scrape-and-ingest:
